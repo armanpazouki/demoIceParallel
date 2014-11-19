@@ -31,16 +31,16 @@
     
   
  
-////#include "physics/ChBodyEasy.h"
-//#include "physics/ChContactContainer.h"
-//#include "collision/ChCModelBulletBody.h"
-////#include "core/ChTimer.h"
-////#include "core/ChRealtimeStep.h"
-////#include "assets/ChTexture.h"
-////#include "unit_IRRLICHT/ChIrrApp.h"
-//#include <cstring>
-//#include <fstream>
-////#include <map>
+//#include "physics/ChBodyEasy.h"
+#include "physics/ChContactContainer.h"
+#include "collision/ChCModelBulletBody.h"
+//#include "core/ChTimer.h"
+//#include "core/ChRealtimeStep.h"
+//#include "assets/ChTexture.h"
+#include "unit_IRRLICHT/ChIrrApp.h"
+#include <cstring>
+#include <fstream>
+//#include <map>
 
 //*************** chrono parallel
 #include <stdio.h>
@@ -63,12 +63,12 @@ using namespace chrono;
 using namespace chrono::collision;
 
 // Use the main namespaces of Irrlicht
-//using namespace irr;
-//using namespace core;
-//using namespace scene;
-//using namespace video;
-//using namespace io;
-//using namespace gui;
+using namespace irr;
+using namespace core;
+using namespace scene;
+using namespace video;
+using namespace io;
+using namespace gui;
 //using namespace std;
 
 const double rhoF = 1000;
