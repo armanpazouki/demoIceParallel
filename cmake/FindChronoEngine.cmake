@@ -15,7 +15,7 @@
 # and others that will be added in future.
 #
 # The two most important variables that one gets after a successfull run of this find script:
-#    CHRONOENGINE_INCLUDES   contains all directories for including .h headers, for all units (components)
+#    CHRONO_INC   contains all directories for including .h headers, for all units (components)
 #    CHRONOENGINE_LIBRARIES  contains all libraries that must be linked, for all units (components)
 # Other less important variables are:
 #    CHRONOENGINE_LIBRARY               the Chrono::Engine main library to be linked
@@ -31,7 +31,7 @@
 #
 #   PROJECT(myproject)
 #   find_package(ChronoEngine COMPONENTS unit_POSTPROCESS unit_FEM)
-#   include(${CHRONOENGINE_INCLUDES})
+#   include(${CHRONO_INC})
 #   add_executable(myexe main.cpp)
 #   target_link_libraries(myexe ${CHRONOENGINE_LIBRARIES})
 #
@@ -41,14 +41,8 @@
 # right before find_package(..)
 
 
-
-#SET (CH_SDKDIR         "" CACHE PATH "Where is your Chrono SDK source installed (the ChronoEngine src/ directory)?")
 SET(CH_LIBDIR_RELEASE "${CHRONO_LIB_PATH}")
 SET(CH_LIBDIR_DEBUG "${CHRONO_LIB_PATH}")
-
-#SET (CH_LIBDIR_DEBUG   "${CHRONO_LIB_PATH}" CACHE PATH "Where are your Chrono debug libraries (ChronoEngine.lib etc.) installed?")
-#SET (CH_LIBDIR_RELEASE "${CHRONO_LIB_PATH}" CACHE PATH "Where are your Chrono release libraries (ChronoEngine.lib etc.) installed?")
-
 
 # ================================================================================
 # Generic definitions that can be useful later
@@ -143,13 +137,12 @@ ENDIF()
 MARK_AS_ADVANCED(CHRONOENGINE_LIBRARY_RELEASE)
 MARK_AS_ADVANCED(CHRONOENGINE_LIBRARY_DEBUG)
 
-SET(CH_INCLUDES "${CH_SDKDIR}")
-SET(CH_INCLUDES ${CH_INCLUDES} "${CH_SDKDIR}/collision/bullet" )
-SET(CH_INCLUDES ${CH_INCLUDES} "${CH_SDKDIR}/collision/gimpact" )
-SET(CH_INCLUDES ${CH_INCLUDES} "${CH_SDKDIR}/collision/convexdecomposition/HACD" )
+SET(CHRONOENGINE_INCLUDES  ${CHRONO_INC})
+SET(CHRONOENGINE_INCLUDES ${CHRONOENGINE_INCLUDES} "${CHRONO_INC}/collision/bullet" )
+SET(CHRONOENGINE_INCLUDES ${CHRONOENGINE_INCLUDES} "${CHRONO_INC}/collision/gimpact" )
+SET(CHRONOENGINE_INCLUDES ${CHRONOENGINE_INCLUDES} "${CHRONO_INC}/collision/convexdecomposition/HACD" )
 
 # Append to easy collective variables
-SET(CHRONOENGINE_INCLUDES  ${CH_INCLUDES})
 SET(CHRONOENGINE_LIBRARIES ${CHRONOENGINE_LIBRARY})
 
 

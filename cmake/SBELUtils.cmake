@@ -25,7 +25,7 @@ SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Release" "Debug" "RelWithD
 ####################################################
 
 OPTION(ENABLE_MPI "MPI Support" OFF)
-OPTION(ENABLE_CUDA "Cuda Support" OFF)
+OPTION(ENABLE_CUDA "Cuda Support" ON)
 OPTION(ENABLE_OPENMP "OpenMP Support" ON)
 
 ####################################################
