@@ -4,6 +4,7 @@ project(demo_Chrono_Parallel)
 
 #set path for local find modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
+find_package(ChronoEngine   COMPONENTS unit_IRRLICHT )
 include(cmake/SBELUtils.cmake)
 enable_openmp_support()
 enable_cuda_support()
@@ -45,7 +46,8 @@ SET(DEMOS "")
 
 
 SET(DEMOS ${DEMOS}
-    test_mixerDVI
+    	test_mixerDVI
+	iceParallel
 )
 
 FOREACH(PROGRAM ${DEMOS})

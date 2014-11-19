@@ -53,7 +53,7 @@
 #include "chrono_utils/ChUtilsCreators.h"
 #include "chrono_utils/ChUtilsInputOutput.h"
 
-#ifdef CHRONO_PARALLEL_HAS_OPENGL
+#ifdef CHRONO_PARALLEL_HAS_OPENGL2
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
 //***********************************
@@ -566,7 +566,7 @@ int main(int argc, char* argv[])
 	// Create all the rigid bodies.
 	create_ice_particles(mphysicalSystem);
 
-#ifdef CHRONO_PARALLEL_HAS_OPENGL
+#ifdef CHRONO_PARALLEL_HAS_OPENGL2
    opengl::ChOpenGLWindow &gl_window = opengl::ChOpenGLWindow::getInstance();
    gl_window.Initialize(1280, 720, "mixerDVI", &mphysicalSystem);
    gl_window.SetCamera(ChVector<>(-3,12,-8), ChVector<>(7.2, 6, 8.2), ChVector<>(0, 1, 0)); //camera
@@ -613,7 +613,7 @@ int main(int argc, char* argv[])
 		application.DoStep();
 		application.GetVideoDriver()->endScene();
 #else
-#ifdef CHRONO_PARALLEL_HAS_OPENGL
+#ifdef CHRONO_PARALLEL_HAS_OPENGL2
 		if (gl_window.Active()) {
 		 gl_window.DoStepDynamics(dT);
 		 gl_window.Render();
