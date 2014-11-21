@@ -419,6 +419,7 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
 	bin->GetCollisionModel()->BuildModel();
 
 	mphysicalSystem.AddBody(bin);
@@ -544,7 +545,7 @@ int main(int argc, char* argv[])
 	mphysicalSystem.GetSettings()->solver.tolerance = tolerance;
 	mphysicalSystem.GetSettings()->solver.alpha = 0;  //Arman, find out what is this
 	mphysicalSystem.GetSettings()->solver.contact_recovery_speed = 2 * shipVelocity;  //Arman, I hope it is the counterpart of SetMaxPenetrationRecoverySpeed
-	mphysicalSystem.ChangeSolverType(APGDRS);  //Arman check this
+	mphysicalSystem.ChangeSolverType(APGDRS);  //Arman check this APGD APGDBLAZE
 	mphysicalSystem.GetSettings()->collision.narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
 
 	mphysicalSystem.GetSettings()->collision.collision_envelope = collisionEnvelop;
