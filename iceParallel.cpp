@@ -86,7 +86,7 @@ ChSharedBodyPtr shipPtr;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
 const double timePause = 1.0; //arman modify
-const double timeMove = 2.5;
+const double timeMove = 25;
 double ship_width = 4;
 double box_X = ship_width, box_Y = 10, box_Z = .4;
 double collisionEnvelop = .04 * mradius;
@@ -273,7 +273,6 @@ void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChSharedBodyPtr mrigidBo
 //	mrigidBody->AddAsset(mtextureball);
 
 	mphysicalSystem.Add(mrigidBody);
-//    sys->AddBody(mrigidBody);
 }
 //***********************************
 void GenerateIceLayers_Rectangular(
@@ -295,6 +294,7 @@ void GenerateIceLayers_Rectangular(
 			for (int k = 0; k < numColZ; k++) {
 				// Create a ball that will collide with wall
 				ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
+
 				ChVector<> pos = ChVector<>(
 						ChVector<>(global_x, global_y, global_z)
 						+ ChVector<>((i+0.5) * spacing, j * spacing, (k+0.5) * spacing)
@@ -329,9 +329,6 @@ void addHCPSheet(
         //z position shifted to center
         z = k * (sqrt(3.0) * expandR)  + expandR + global_z;
         // x, y, z contain coordinates for sphere position
-
-
-
 
 
 		ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
@@ -375,7 +372,6 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	double minert = (2./5.)* mmass * pow(mradius,2);
 	ChVector<> boxMin = ChVector<>(-.8, 0, -2.4);
 	ChVector<> hdim = ChVector<>(16, 12, 21.2);
-	ChVector<> centerLF = 0.5 * hdim;
 	ChVector<> center = 0.5 * hdim + boxMin;
 	ChVector<> boxMax = boxMin + hdim;
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
@@ -410,7 +406,7 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	bin->SetMaterialSurface(mat);
 	bin->SetIdentifier(binId);
 	bin->SetMass(1);
-	bin->SetPos(center);
+	bin->SetPos(ChVector<>(center.x, center.y - 0.5 * hdim.y, center.z));
 	bin->SetRot(ChQuaternion<>(1, 0, 0, 0));
 	bin->SetCollide(true);
 	bin->SetBodyFixed(true);
@@ -418,11 +414,11 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	bin->GetCollisionModel()->ClearModel();
 	//utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(110,1,110), ChVector<>(0, -10, 0)); //earth, not necessary
 
-	utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(hdim.x, hdim.y, hthick), boxMin + ChVector<>(centerLF.x, 0, hdim.z + 0.5*hthick));	//end wall
-	utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(hthick, hdim.y, hdim.z), boxMin + ChVector<>(0 - 0.5*hthick, 0, centerLF.z));		//side wall
-	utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(hthick, hdim.y, hdim.z), boxMin + ChVector<>(hdim.x + 0.5*hthick, 0, centerLF.z));	//side wall
-	utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(small_wall_Length, hdim.y, hthick), boxMin + ChVector<>(0.5*small_wall_Length, 0, -0.5*hthick)); 	//beginning wall 1
-	utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(small_wall_Length, hdim.y, hthick), boxMin + ChVector<>(hdim.x - 0.5*small_wall_Length, 0, -0.5*hthick)); //beginning wall 2
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hdim.x, hdim.y, hthick), ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));	//end wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
 	bin->GetCollisionModel()->BuildModel();
 
 	mphysicalSystem.AddBody(bin);
@@ -435,21 +431,21 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	shipInitialPosZ = boxMin.z - .5 * box_Z;
 
 	shipPtr = ChSharedBodyPtr(new ChBody(new ChCollisionModelParallel));
-	shipInitialPos = ChVector<>(center.x,  1, shipInitialPosZ);
+	shipInitialPos = ChVector<>(center.x,  center.y - .5 * hdim.y, shipInitialPosZ);
 	shipPtr->SetPos(shipInitialPos);
 	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
 	shipPtr->SetMaterialSurface(mat);
 	shipPtr->SetPos_dt(ChVector<>(0,0,0));
 	shipPtr->SetMass(boxMass);
 	shipPtr->SetInertiaXX(ChVector<>(bI2, bI3, bI1));
-	bin->SetIdentifier(binId);
-	bin->SetCollide(true);
-	bin->SetBodyFixed(false);
+	shipPtr->SetIdentifier(shipId);
+	shipPtr->SetCollide(true);
+	shipPtr->SetBodyFixed(false);
 
-	bin->GetCollisionModel()->ClearModel();
+	shipPtr->GetCollisionModel()->ClearModel();
 //	shipPtr->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
-	utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(box_X, box_Y, box_Z), shipInitialPos); //beginning wall 2
-	bin->GetCollisionModel()->BuildModel();
+	utils::AddBoxGeometry(shipPtr.get_ptr(), 0.5 * ChVector<>(box_X, box_Y, box_Z), ChVector<>(0,0,0)); //beginning wall 2. Need "0.5 *" since chronoparallel is apparently different
+	shipPtr->GetCollisionModel()->BuildModel();
 	mphysicalSystem.Add(shipPtr);
 
 //	// optional, attach a texture for better visualization, Arman Texture
@@ -524,7 +520,7 @@ int main(int argc, char* argv[])
 	real tolerance = 1e-3;
 	// ************
 
-#define irrlichtVisualization false
+#define irrlichtVisualization true
 	// Create a ChronoENGINE physical system
 	ChSystemParallelDVI mphysicalSystem;
 
@@ -600,6 +596,8 @@ int main(int argc, char* argv[])
 
 	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << std::endl;
+
+	printf("***** number of bodies %d\n", mphysicalSystem.Get_bodylist()->size());
 
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
