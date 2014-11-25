@@ -40,6 +40,7 @@
 #include "unit_IRRLICHT/ChIrrApp.h"
 #include <cstring>
 #include <fstream>
+#include <sstream>
 //#include <map>
 
 //*************** chrono parallel
@@ -69,7 +70,7 @@ using namespace scene;
 using namespace video;
 using namespace io;
 using namespace gui;
-//using namespace std;
+using namespace std;
 
 const double rhoF = 1000;
 const double rhoR = 917;
@@ -86,7 +87,7 @@ ChSharedBodyPtr shipPtr;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
 const double timePause = 1.0; //arman modify
-const double timeMove = 25;
+const double timeMove = 2.5;
 double ship_width = 4;
 double box_X = ship_width, box_Y = 10, box_Z = .4;
 double collisionEnvelop = .04 * mradius;
@@ -154,7 +155,7 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysica
 	ChSharedPtr<ChForce> hydroForce;
 	ChSharedPtr<ChForce> hydroTorque;
 
-//	std::string forceTag("hydrodynamics_force");
+//	string forceTag("hydrodynamics_force");
 	char forceTag[] = "hydrodynamics_force";
 	char torqueTag[] = "hydrodynamics_torque";
 	hydroForce = mrigidBody->SearchForce(forceTag);
@@ -200,39 +201,32 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 	mForce = ChVector<>(0,0,0);
 	mTorque = ChVector<>(0,0,0);
 	ChContactContainer* container  = (ChContactContainer *) mphysicalSystem.GetContactContainer();
-//	std::map<ChBody*, ChVector<> > m_forces;
-//	std::map<ChBody*, ChVector<> > m_torques;
+//	map<ChBody*, ChVector<> > m_forces;
+//	map<ChBody*, ChVector<> > m_torques;
 //	ChVector<> mForce;
 //	ChVector<> mTorque;
 
-	std::list<ChContact*> m_list = container->GetContactList();
-	for (std::list<ChContact *>::iterator it=m_list.begin(); it != m_list.end(); ++it){
-	  ChVector<> force_contactFrame = (*it)->GetContactForce();
-	  ChVector<> force_abs = *((*it)->GetContactPlane()) * force_contactFrame;
-	  ChModelBulletBody * model_A = (ChModelBulletBody *) (*it)->GetModelA();
-	  ChModelBulletBody * model_B = (ChModelBulletBody *) (*it)->GetModelB();
-//		  if ((model_A->GetBody() != shipPtr->GetBody()) && (model_B->GetBody() != shipPtr->GetBody())) {
-//			  continue;
-//		  }
-	  ChBody * body_A = model_A->GetBody();
-	  ChBody * body_B = model_B->GetBody();
-
-	  if (body_A == (ChBody*)shipPtr.get_ptr()) {
-		  mForce -= force_abs;
-
-		  ChVector<> point_on_A = (*it)->GetContactP1();
-		  mTorque -= (point_on_A - body_A->GetPos()) % force_abs;
-//		  ChVector<> local_point_on_A = ChTransform<>::TransformParentToLocal(point_on_A, body_A->GetPos(), body_A->GetRot());
-//		  mTorque += local_point_on_A % force;
-	  } else if (body_B == (ChBody*)shipPtr.get_ptr()) {
-		  mForce += force_abs;
-
-		  ChVector<> point_on_B = (*it)->GetContactP2();
-		  mTorque += (point_on_B - body_B->GetPos()) % force_abs;
-//		  ChVector<> local_point_on_B = ChTransform<>::TransformParentToLocal(point_on_B, body_B->GetPos(), body_B->GetRot());
-//		  mTorque -= local_point_on_B % force;
-	  }
+	unsigned int bodyID = shipPtr->GetId();// (((ChBody)shipPtr)->GetId());
+	int mult = 3;
+	if (mphysicalSystem.GetSettings()->solver.solver_mode != NORMAL) {
+		mult = 6;
 	}
+
+	double gamma0 = mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 0];
+	double gamma1 = mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 1];
+	double gamma2 = mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 2];
+
+	if (mphysicalSystem.GetSettings()->solver.solver_mode != NORMAL) {
+		gamma0 += mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 3];
+		gamma1 += mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 4];
+		gamma2 += mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 5];
+	}
+	printf("&& check time step %f ID %d\n", mphysicalSystem.GetStep(), bodyID);
+	mForce = mphysicalSystem.GetStep() * ChVector<>(gamma0, gamma1, gamma2);
+
+	real3 bodyCenter = 	mphysicalSystem.data_manager->host_data.ObA_rigid[bodyID];
+	real3 contactPt = 	mphysicalSystem.data_manager->host_data.cpta_rigid_rigid[bodyID];
+	mTorque = ChVector<>(contactPt.x - bodyCenter.x, contactPt.y - bodyCenter.y, contactPt.z - bodyCenter.z) % mForce;
 }
 //***********************************
 void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChSharedBodyPtr mrigidBody, ChVector<> pos, double mmass, double minert) {
@@ -517,8 +511,8 @@ int main(int argc, char* argv[])
 //	double time_step = 1e-3;
 	double time_end = 100;
 	double out_fps = 50;
-	uint max_iteration = 30;
-	real tolerance = 1e-3;
+	uint max_iteration = 30;//10000;
+	double tolerance = 1e-3;
 	// ************
 
 #define irrlichtVisualization true
@@ -542,7 +536,7 @@ int main(int argc, char* argv[])
 	mphysicalSystem.GetSettings()->solver.max_iteration_sliding = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.max_iteration_spinning = 0;
 	mphysicalSystem.GetSettings()->solver.max_iteration_bilateral = max_iteration / 3;
-	mphysicalSystem.GetSettings()->solver.tolerance = tolerance;
+	mphysicalSystem.GetSettings()->solver.tolerance = 0;//tolerance;
 	mphysicalSystem.GetSettings()->solver.alpha = 0;  //Arman, find out what is this
 	mphysicalSystem.GetSettings()->solver.contact_recovery_speed = 2 * shipVelocity;  //Arman, I hope it is the counterpart of SetMaxPenetrationRecoverySpeed
 	mphysicalSystem.ChangeSolverType(APGDRS);  //Arman check this APGD APGDBLAZE
@@ -558,7 +552,7 @@ int main(int argc, char* argv[])
 
 
 
-	std::fstream outForceData("forceData.txt", std::ios::out);
+	ofstream outForceData("forceData.txt");
 
 	// Create all the rigid bodies.
 	create_ice_particles(mphysicalSystem);
@@ -594,9 +588,10 @@ int main(int argc, char* argv[])
 		application.SetStepManage(true);
 		application.SetTimestep(dT);  					//Arman modify
 #endif
+		outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
+				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 
-	outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
-			<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << std::endl;
+		outForceData.close();
 
 	printf("***** number of bodies %d\n", mphysicalSystem.Get_bodylist()->size());
 
@@ -642,20 +637,24 @@ int main(int argc, char* argv[])
 //			create_hydronynamic_force(mphysicalSystem.Get_bodylist()->at(i), mphysicalSystem, surfaceLoc, false);
 //
 //		}
-		std::vector<ChBody*>::iterator ibody = mphysicalSystem.Get_bodylist()->begin();
+		vector<ChBody*>::iterator ibody = mphysicalSystem.Get_bodylist()->begin();
 		double energy = 0;
 		while (ibody != mphysicalSystem.Get_bodylist()->end()) {
 			create_hydronynamic_force(*ibody, mphysicalSystem, surfaceLoc, false);
 			energy += pow((*ibody)->GetPos_dt().Length() , 2);
 			ibody++;
 		}
-//		printf("time %f, force %f %f %f, shipVelocity %f, simulation time %f, energy %f\n", mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, shipPtr->GetBody()->GetPos_dt().z, myTimer(), energy);
-		outForceData << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
+
+		stringstream outDataSS;
+		outDataSS << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
 				mForce.Length() << ", " <<
 				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
-				shipPtr->GetPos_dt().z << ", " << shipPtr->GetPos().z << ", " << energy << ", " << myTimer() << std::endl;
+				shipPtr->GetPos_dt().z << ", " << shipPtr->GetPos().z << ", " << energy << ", " << myTimer() << endl;
+		ofstream outData("forceData.txt", ios::app);
+		outData<<outDataSS.str();
+		outData.close();
 
-		printf("Time %f, energy %f, time per step %f\n", mphysicalSystem.GetChTime(), energy, myTimer());
+		printf("Time %f, energy %f, time per step %f, forceMagnitude %f\n", mphysicalSystem.GetChTime(), energy, myTimer(), mForce.Length());
 	}
 	outForceData.close();
 	return 0;
