@@ -79,7 +79,7 @@ const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 //******************* ship and sphere stuff
 double mradius = .4;
-int numLayers = 2;
+int numLayers = 1;
 
 //ChBodySceneNode* shipPtr;
 //ChSharedPtr<ChBodyEasyBox> shipPtr; //old irrlicht version
@@ -200,6 +200,7 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysica
 void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> & mForce, ChVector<> & mTorque) {
 	mForce = ChVector<>(0,0,0);
 	mTorque = ChVector<>(0,0,0);
+	real3 myForce;
 	ChContactContainer* container  = (ChContactContainer *) mphysicalSystem.GetContactContainer();
 //	map<ChBody*, ChVector<> > m_forces;
 //	map<ChBody*, ChVector<> > m_torques;
@@ -207,26 +208,76 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 //	ChVector<> mTorque;
 
 	unsigned int bodyID = shipPtr->GetId();// (((ChBody)shipPtr)->GetId());
-	int mult = 3;
-	if (mphysicalSystem.GetSettings()->solver.solver_mode != NORMAL) {
-		mult = 6;
+	int offset = 1; //Arman modify this
+	if (mphysicalSystem.GetSettings()->solver.solver_mode != SLIDING) {
+		offset = 3;
+	} else if (mphysicalSystem.GetSettings()->solver.solver_mode != SPINNING) {
+		offset = 6;
 	}
 
-	double gamma0 = mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 0];
-	double gamma1 = mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 1];
-	double gamma2 = mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 2];
+	real3 gam(0,0,0);
+	real3 gammaRoll(0,0,0);
+	double dT = mphysicalSystem.GetStep();
 
-	if (mphysicalSystem.GetSettings()->solver.solver_mode != NORMAL) {
-		gamma0 += mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 3];
-		gamma1 += mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 4];
-		gamma2 += mphysicalSystem.data_manager->host_data.gamma_data[bodyID * mult + 5];
+	for (int i = 0; i < mphysicalSystem.data_manager->num_contacts; i++) {
+		int2 ids = mphysicalSystem.data_manager->host_data.bids_rigid_rigid[i];
+		real3 U = mphysicalSystem.data_manager->host_data.norm_rigid_rigid[i];
+		if (ids.x != bodyID && ids.y != bodyID) continue;
+		if (mphysicalSystem.GetSettings()->solver.solver_mode == NORMAL) {
+			gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
+			myForce += (-gam.x * dT * U);
+		} else if (mphysicalSystem.GetSettings()->solver.solver_mode == SLIDING) { //Arman check this
+			gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
+			gam.y = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 1];
+			gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];
+			real3 V, W;
+			Orthogonalize(U, V, W);
+			myForce += dT * (-U * gam.x - V * gam.y - W * gam.z);
+//			//*** torque related
+//		    bool2 active = contact_active[index];
+//		    if (active.x != 0) {
+//		       real3 T3, T4, T5;
+//		       Compute_Jacobian(rot[index], U, V, W, ptA[index], T3, T4, T5);
+//		       updateO[index] = T3 * gam.x + T4 * gam.y + T5 * gam.z;
+//		    }
+//		    if (active.y != 0) {
+//		       real3 T6, T7, T8;
+//		       Compute_Jacobian(rot[index + num_contacts], U, V, W, ptB[index], T6, T7, T8);
+//		       //updateV[index + num_contacts] = U * gam.x + V * gam.y + W * gam.z;
+//		       updateO[index + num_contacts] = -T6 * gam.x - T7 * gam.y - T8 * gam.z;
+//		    }
+		} else if (mphysicalSystem.GetSettings()->solver.solver_mode == SPINNING) { //Arman check this
+			gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
+			gam.y = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 1];
+			gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];			real3 V, W;
+			Orthogonalize(U, V, W);
+			myForce += (-U * gam.x - V * gam.y - W * gam.z) * dT;
+//			//*** torque related
+//			if (active.x != 0) {
+//			 real4 quat = rot[index];
+//			 real3 T3, T4, T5, TA, TB, TC;
+//			 Compute_Jacobian(quat, U, V, W, ptA[index], T3, T4, T5);
+//			 Compute_Jacobian_Rolling(quat, U, V, W, TA, TB, TC);
+//
+//			 updateO[index] = T3 * gam.x + T4 * gam.y + T5 * gam.z - TA * gam_roll.x - TB * gam_roll.y - TC * gam_roll.z;
+//			}
+//			if (active.y != 0) {
+//			 real4 quat = rot[index + num_contacts];
+//			 real3 T6, T7, T8, TA, TB, TC;
+//			 Compute_Jacobian(quat, U, V, W, ptB[index], T6, T7, T8);
+//			 Compute_Jacobian_Rolling(quat, U, V, W, TA, TB, TC);
+//			 //updateV[index + num_contacts] = U * gam.x + V * gam.y + W * gam.z;
+//			 updateO[index + num_contacts] = -T6 * gam.x - T7 * gam.y - T8 * gam.z + TA * gam_roll.x + TB * gam_roll.y + TC * gam_roll.z;
+//			}
+		}
 	}
-	printf("&& check time step %f ID %d\n", mphysicalSystem.GetStep(), bodyID);
-	mForce = mphysicalSystem.GetStep() * ChVector<>(gamma0, gamma1, gamma2);
 
-	real3 bodyCenter = 	mphysicalSystem.data_manager->host_data.ObA_rigid[bodyID];
-	real3 contactPt = 	mphysicalSystem.data_manager->host_data.cpta_rigid_rigid[bodyID];
-	mTorque = ChVector<>(contactPt.x - bodyCenter.x, contactPt.y - bodyCenter.y, contactPt.z - bodyCenter.z) % mForce;
+
+	//extra torque term
+//	real3 bodyCenter = 	mphysicalSystem.data_manager->host_data.ObA_rigid[bodyID];
+//	real3 contactPt = 	mphysicalSystem.data_manager->host_data.cpta_rigid_rigid[bodyID];
+//	mTorque = ChVector<>(contactPt.x - bodyCenter.x, contactPt.y - bodyCenter.y, contactPt.z - bodyCenter.z) % mForce;
+	mForce = ChVector<>(myForce.x, myForce.y, myForce.z);
 }
 //***********************************
 void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChSharedBodyPtr mrigidBody, ChVector<> pos, double mmass, double minert) {
@@ -503,7 +554,7 @@ void FixShip(ChSystemParallelDVI& mphysicalSystem) {
 int main(int argc, char* argv[])
 { 
 	ChTimer<double> myTimer;
-	int threads = 8;
+	int threads = 1;
 
 	// ***** params
 	double gravity = 9.81;
@@ -515,7 +566,8 @@ int main(int argc, char* argv[])
 	double tolerance = 1e-3;
 	// ************
 
-#define irrlichtVisualization true
+#define irrlichtVisualization false
+
 	// Create a ChronoENGINE physical system
 	ChSystemParallelDVI mphysicalSystem;
 
