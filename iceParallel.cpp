@@ -208,7 +208,7 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 //	ChVector<> mTorque;
 
 	unsigned int bodyID = shipPtr->GetId();// (((ChBody)shipPtr)->GetId());
-	int offset = 1; //Arman modify this
+	int offset = 3; //Arman modify this
 	if (mphysicalSystem.GetSettings()->solver.solver_mode != SLIDING) {
 		offset = 3;
 	} else if (mphysicalSystem.GetSettings()->solver.solver_mode != SPINNING) {
@@ -249,7 +249,8 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 		} else if (mphysicalSystem.GetSettings()->solver.solver_mode == SPINNING) { //Arman check this
 			gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
 			gam.y = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 1];
-			gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];			real3 V, W;
+			gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];
+			real3 V, W;
 			Orthogonalize(U, V, W);
 			myForce += (-U * gam.x - V * gam.y - W * gam.z) * dT;
 //			//*** torque related
@@ -566,7 +567,7 @@ int main(int argc, char* argv[])
 	double tolerance = 1e-3;
 	// ************
 
-#define irrlichtVisualization false
+#define irrlichtVisualization true
 
 	// Create a ChronoENGINE physical system
 	ChSystemParallelDVI mphysicalSystem;
@@ -583,7 +584,7 @@ int main(int argc, char* argv[])
 	mphysicalSystem.Set_G_acc(ChVector<>(0, -gravity, 0));
 
 	// Set solver parameters
-	mphysicalSystem.GetSettings()->solver.solver_mode = SLIDING; //Arman, What is this
+	mphysicalSystem.GetSettings()->solver.solver_mode = SLIDING; //NORMAL, SPINNING
 	mphysicalSystem.GetSettings()->solver.max_iteration_normal = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.max_iteration_sliding = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.max_iteration_spinning = 0;
