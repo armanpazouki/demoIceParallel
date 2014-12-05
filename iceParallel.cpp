@@ -580,11 +580,12 @@ int main(int argc, char* argv[])
 	mphysicalSystem.SetParallelThreadNumber(threads);
 	omp_set_num_threads(threads);
 	//************************************************
+
 	// Set gravitational acceleration
 	mphysicalSystem.Set_G_acc(ChVector<>(0, -gravity, 0));
 
 	// Set solver parameters
-	mphysicalSystem.GetSettings()->solver.solver_mode = SLIDING; //NORMAL, SPINNING
+	mphysicalSystem.GetSettings()->solver.solver_mode = NORMAL; //NORMAL, SPINNING
 	mphysicalSystem.GetSettings()->solver.max_iteration_normal = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.max_iteration_sliding = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.max_iteration_spinning = 0;
