@@ -78,7 +78,7 @@ const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 //******************* ship and sphere stuff
-double mradius = .4;
+double mradius = .2;
 int numLayers = 1;
 
 //ChBodySceneNode* shipPtr;
@@ -555,7 +555,7 @@ void FixShip(ChSystemParallelDVI& mphysicalSystem) {
 int main(int argc, char* argv[])
 { 
 	ChTimer<double> myTimer;
-	int threads = 1;
+	int threads = 2;
 
 	// ***** params
 	double gravity = 9.81;
@@ -563,7 +563,7 @@ int main(int argc, char* argv[])
 //	double time_step = 1e-3;
 	double time_end = 100;
 	double out_fps = 50;
-	uint max_iteration = 30;//10000;
+	uint max_iteration = 1000;//10000;
 	double tolerance = 1e-3;
 	// ************
 
@@ -585,7 +585,7 @@ int main(int argc, char* argv[])
 	mphysicalSystem.Set_G_acc(ChVector<>(0, -gravity, 0));
 
 	// Set solver parameters
-	mphysicalSystem.GetSettings()->solver.solver_mode = NORMAL; //NORMAL, SPINNING
+	mphysicalSystem.GetSettings()->solver.solver_mode = SLIDING; //NORMAL, SPINNING
 	mphysicalSystem.GetSettings()->solver.max_iteration_normal = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.max_iteration_sliding = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.max_iteration_spinning = 0;
