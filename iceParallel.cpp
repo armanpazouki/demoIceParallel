@@ -557,6 +557,12 @@ int main(int argc, char* argv[])
 	ChTimer<double> myTimer;
 	int threads = 2;
 
+	if (argc > 1) {
+		const char* text = argv[1];
+    	threads = atoi(text);
+		printf("num threads %d \n", threads);
+	}
+
 	// ***** params
 	double gravity = 9.81;
 	double dT = 0.1* mradius / shipVelocity; //moving 0.1*R at each time step
