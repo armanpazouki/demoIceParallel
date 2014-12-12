@@ -106,7 +106,6 @@ ADD_DEFINITIONS( "-DBP_USE_FIXEDPOINT_INT_32" )   # for Bullet to use 32 bit mat
 # ================================================================================
 ##### THE MAIN CHRONOENGINE LIBRARY
 
-SET(CHRONOENGINE_LIBRARY ${CHROMO_LIB})
 FIND_LIBRARY(CHRONOENGINE_LIBRARY_RELEASE
   NAMES ChronoEngine
   PATHS ${CH_LIBDIR_RELEASE}
@@ -375,6 +374,15 @@ IF( ChronoEngine_FIND_COMPONENTS )
         SET(CHRONOENGINE_INCLUDES  ${CHRONOENGINE_INCLUDES}  ${CH_IRRLICHTINC})
         SET(CHRONOENGINE_LIBRARIES ${CHRONOENGINE_LIBRARIES} ${CH_IRRLICHTLIB})
 
+    endif()
+
+    # ================================================================================
+    # Custom add
+    if (${CH_USE_UNIT_OPENGL})
+	FIND_PACKAGE(GLM)
+	FIND_PACKAGE(GLFW)
+	FIND_LIBRARY(CHRONO_LIB_OPENGL NAMES ChronoEngine_OpenGL PATHS ${CHRONO_PARALLEL_LIB_PATH} REQUIRED)
+	SET(CHRONOENGINE_LIBRARIES ${CHRONOENGINE_LIBRARIES} ${CHRONO_LIB_OPENGL})
     endif()
 
 ENDIF()
