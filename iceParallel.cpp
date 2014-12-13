@@ -562,8 +562,8 @@ int main(int argc, char* argv[])
 	if (argc > 1) {
 		const char* text = argv[1];
     	threads = atoi(text);
-    	outSimulationInfo << "num threads: " << threads << endl;
 	}
+	outSimulationInfo << "** num threads: " << threads << endl;
 
 	// ***** params
 	double gravity = 9.81;
@@ -575,7 +575,7 @@ int main(int argc, char* argv[])
 	double tolerance = 1e-3;
 	// ************
 
-#define irrlichtVisualization true
+#define irrlichtVisualization false
 
 	// Create a ChronoENGINE physical system
 	ChSystemParallelDVI mphysicalSystem;
@@ -583,6 +583,7 @@ int main(int argc, char* argv[])
 	//******************** OMP settings **************
 	// Set number of threads.
 	int max_threads = mphysicalSystem.GetParallelThreadNumber();
+	outSimulationInfo << "** max number of threads: " << max_threads << endl;
 	if (threads > max_threads)
 	  threads = max_threads;
 	mphysicalSystem.SetParallelThreadNumber(threads);
@@ -610,8 +611,8 @@ int main(int argc, char* argv[])
 	mphysicalSystem.GetSettings()->collision.max_body_per_bin = 100;		// Arman check
 
 	outSimulationInfo << "****************************************************************************" << endl;
-	outSimulationInfo << "dT: " << dT <<"shipVelocity: "<< shipVelocity << "particles_radius: " << mradius <<
-			"timePause: " << timePause << "timeMove: " << timeMove << endl;
+	outSimulationInfo << "dT: " << dT <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
+			" timePause: " << timePause << " timeMove: " << timeMove << endl;
 
 	ofstream outForceData("forceData.txt");
 
@@ -715,8 +716,8 @@ int main(int argc, char* argv[])
 		outData<<outDataSS.str();
 		outData.close();
 
-		outSimulationInfo << "Time: " <<  mphysicalSystem.GetChTime() << "energy: " << energy <<
-				"time per step: " << myTimer() << "forceMagnitude: " << mForce.Length() << endl;
+		outSimulationInfo << "Time: " <<  mphysicalSystem.GetChTime() << " energy: " << energy <<
+				" time per step: " << myTimer() << " forceMagnitude: " << mForce.Length() << endl;
 		printf("Time %f, energy %f, time per step %f, forceMagnitude %f\n", mphysicalSystem.GetChTime(), energy, myTimer(), mForce.Length());
 
 	}
