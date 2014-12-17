@@ -78,7 +78,7 @@ const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 //******************* ship and sphere stuff
-double mradius = .2;
+double mradius = .3;
 int numLayers = 1;
 
 //ChBodySceneNode* shipPtr;
@@ -198,24 +198,24 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysica
 	}
 }
 //**********************************
-void ConnectShearBox(ChSystemParallel* system, ChSharedPtr<ChBody> ground, ChSharedPtr<ChBody> box)
-{
-  ChSharedPtr<ChLinkLockPrismatic> prismatic(new ChLinkLockPrismatic);
-  prismatic->Initialize(ground, box, ChCoordsys<>(ChVector<>(0, 0, 2 * hdimZ), Q_from_AngY(CH_C_PI_2)));
-  prismatic->SetName("prismatic_box_ground");
-  system->AddLink(prismatic);
-
-  ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0.0, desiredVelocity));
-
-  ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
-  ChVector<> pt1(0, 0, 2 * hdimZ);
-  ChVector<> pt2(1, 0, 2 * hdimZ);
-  actuator->Initialize(ground, box, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
-  actuator->SetName("actuator");
-  actuator->Set_lin_offset(1);
-  actuator->Set_dist_funct(actuator_fun);
-  system->AddLink(actuator);
-}
+//void ConnectShearBox(ChSystemParallel* system, ChSharedPtr<ChBody> ground, ChSharedPtr<ChBody> box)
+//{
+//  ChSharedPtr<ChLinkLockPrismatic> prismatic(new ChLinkLockPrismatic);
+//  prismatic->Initialize(ground, box, ChCoordsys<>(ChVector<>(0, 0, 2 * hdimZ), Q_from_AngY(CH_C_PI_2)));
+//  prismatic->SetName("prismatic_box_ground");
+//  system->AddLink(prismatic);
+//
+//  ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0.0, desiredVelocity));
+//
+//  ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
+//  ChVector<> pt1(0, 0, 2 * hdimZ);
+//  ChVector<> pt2(1, 0, 2 * hdimZ);
+//  actuator->Initialize(ground, box, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
+//  actuator->SetName("actuator");
+//  actuator->Set_lin_offset(1);
+//  actuator->Set_dist_funct(actuator_fun);
+//  system->AddLink(actuator);
+//}
 
 void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> & mForce, ChVector<> & mTorque) {
 	mForce = ChVector<>(0,0,0);
@@ -597,7 +597,7 @@ int main(int argc, char* argv[])
 	double tolerance = 1e-3;
 	// ************
 
-#define irrlichtVisualization false
+#define irrlichtVisualization true
 
 	// Create a ChronoENGINE physical system
 	ChSystemParallelDVI mphysicalSystem;
