@@ -87,7 +87,7 @@ ChSharedBodyPtr shipPtr;
 ChSharedBodyPtr bin;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
-const double timePause = 1.0; //arman modify
+const double timePause = 0.2; //arman modify
 const double timeMove = 2.5;
 double ship_width = 4;
 double box_X = ship_width, box_Y = 10, box_Z = .4;
@@ -702,8 +702,10 @@ int main(int argc, char* argv[])
 #endif
 #endif
 		if (mphysicalSystem.GetChTime() < timePause) {
+			shipPtr->SetCollide(true);
 			shipPtr->SetBodyFixed(true);
 		} else {
+//			shipPtr->SetCollide(true);
 			shipPtr->SetBodyFixed(false);
 			MoveShip_Kinematic(mphysicalSystem);
 		}
