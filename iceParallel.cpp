@@ -84,6 +84,7 @@ int numLayers = 1;
 //ChBodySceneNode* shipPtr;
 //ChSharedPtr<ChBodyEasyBox> shipPtr; //old irrlicht version
 ChSharedBodyPtr shipPtr;
+ChSharedBodyPtr bin;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
 const double timePause = 1.0; //arman modify
@@ -149,7 +150,7 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 	//****************** Total Force
 	F_Hydro = F_Buoyancy + F_Drag; // it is assumed that F_Drag is applied at the buoyancy center
 }
-
+//**********************************
 void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation, bool createForce) {
 	// ***** insertion of force
 	ChSharedPtr<ChForce> hydroForce;
@@ -195,6 +196,25 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysica
 		T_Drag.Normalize();
 		hydroTorque->SetDir(T_Drag);
 	}
+}
+//**********************************
+void ConnectShearBox(ChSystemParallel* system, ChSharedPtr<ChBody> ground, ChSharedPtr<ChBody> box)
+{
+  ChSharedPtr<ChLinkLockPrismatic> prismatic(new ChLinkLockPrismatic);
+  prismatic->Initialize(ground, box, ChCoordsys<>(ChVector<>(0, 0, 2 * hdimZ), Q_from_AngY(CH_C_PI_2)));
+  prismatic->SetName("prismatic_box_ground");
+  system->AddLink(prismatic);
+
+  ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0.0, desiredVelocity));
+
+  ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
+  ChVector<> pt1(0, 0, 2 * hdimZ);
+  ChVector<> pt2(1, 0, 2 * hdimZ);
+  actuator->Initialize(ground, box, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
+  actuator->SetName("actuator");
+  actuator->Set_lin_offset(1);
+  actuator->Set_dist_funct(actuator_fun);
+  system->AddLink(actuator);
 }
 
 void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> & mForce, ChVector<> & mTorque) {
@@ -448,7 +468,7 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	double hole_width = 1.2 * ship_width;
 	double small_wall_Length = 0.5 * (hdim.x - hole_width);
 
-	ChSharedBodyPtr bin(new ChBody(new ChCollisionModelParallel));
+	bin = ChSharedBodyPtr(new ChBody(new ChCollisionModelParallel));
 	bin->SetMaterialSurface(mat);
 	bin->SetIdentifier(binId);
 	bin->SetMass(1);
@@ -494,63 +514,65 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	utils::AddBoxGeometry(shipPtr.get_ptr(), 0.5 * ChVector<>(box_X, box_Y, box_Z), ChVector<>(0,0,0)); //beginning wall 2. Need "0.5 *" since chronoparallel is apparently different
 	shipPtr->GetCollisionModel()->BuildModel();
 	mphysicalSystem.Add(shipPtr);
-
-//	// optional, attach a texture for better visualization, Arman Texture
-//	ChSharedPtr<ChTexture> mtexturebox(new ChTexture());
-//	mtexturebox->SetTextureFilename(GetChronoDataFile("../data/cubetexture_borders.png"));
-//	shipPtr->AddAsset(mtexturebox);
-//	//**** end ship initialization
-
-	char forceTag[] = "pulling_force";
-	ChSharedPtr<ChForce> pullingForce = ChSharedPtr<ChForce>(new ChForce);
-	pullingForce->SetMode(FTYPE_FORCE); // no need for this. It is the default option.
-	shipPtr->AddForce(pullingForce);
-	// ** or: hydroForce = ChSharedPtr<ChForce>(new ChForce());
-	pullingForce->SetName(forceTag);
-	pullingForce->SetVpoint(shipPtr->GetPos());
-	pullingForce->SetMforce(0);
-	pullingForce->SetDir(ChVector<>(1,0,0));
-
-	//***** prismatic constraint between ship and bed
-//	ChSharedPtr<ChLinkLockPlanePlane> shipConstraint(new ChLinkLockPlanePlane);
-//	shipConstraint->Initialize(shipPtr->GetBody(), earthPtr->GetBody(),
-//			ChCoordsys<>(ChVector<>(30,  9, -25) , Q_from_AngAxis(CH_C_PI/2, VECT_X))
-//			);
-	ChSharedPtr<ChLinkLockPrismatic> shipConstraint(new ChLinkLockPrismatic);
-	shipConstraint->Initialize(shipPtr, bin,
-			ChCoordsys<>(ChVector<>(.30,  .09, -.25) , QUNIT)
-			);
-	mphysicalSystem.AddLink(shipConstraint);
 }
 
-void MoveShip(ChSystemParallelDVI& mphysicalSystem) {
-	static bool onCall = false;
+//***** prismatic constraint between ship and bed
+void Add_ship_ground_prismatic(ChSystemParallelDVI& mphysicalSystem) {
+	ChSharedPtr<ChLinkLockPrismatic> shipGroundPrismatic(new ChLinkLockPrismatic);
+	shipGroundPrismatic->Initialize(shipPtr, bin,
+			ChCoordsys<>(ChVector<>(.30,  .09, -.25) , QUNIT)
+			);
+	shipGroundPrismatic->SetName("ship_ground_prismatic");
+	mphysicalSystem.AddLink(shipGroundPrismatic);
+}
+
+void Add_Actuator(ChSystemParallelDVI& mphysicalSystem) {
+	ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0.0, shipVelocity));
+	ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
+	double offsetDist = 1;
+	ChVector<> pt1(0, 0, 0);
+	ChVector<> pt2 = pt1 + ChVector<>(0, 0, offsetDist);
+	actuator->Initialize(shipPtr, bin, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
+	actuator->SetName("actuator");
+	actuator->Set_lin_offset(offsetDist);
+	actuator->Set_dist_funct(actuator_fun);
+	mphysicalSystem.AddLink(actuator);
+}
+
+void MoveShip_Kinematic(ChSystemParallelDVI& mphysicalSystem) {
+	ChVector<> shipVel = ChVector<>(0,0,shipVelocity);
+	ChVector<> shipPos = shipInitialPos + shipVel * (mphysicalSystem.GetChTime() - timePause);
+	shipPtr->SetPos(shipPos);
+	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
+	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
+	shipPtr->SetWvel_loc(ChVector<>(0,0,0));
+}
+
+//void MoveShip_PID(ChSystemParallelDVI& mphysicalSystem) {
+//	char forceTag[] = "pulling_force";
+//	ChSharedPtr<ChControllerPID> my_controllerPID;
+//	static bool onCall = false;
 //	if (!onCall) {
 //		onCall = true;
-		ChVector<> shipVel = ChVector<>(0,0,shipVelocity);
-		ChVector<> shipPos = shipInitialPos + shipVel * (mphysicalSystem.GetChTime() - timePause);
-		shipPtr->SetPos(shipPos);
-		shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
-		shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
-		shipPtr->SetWvel_loc(ChVector<>(0,0,0));
-
-
+//		my_controllerPID = ChSharedPtr<ChControllerPID>(new ChControllerPID);
+//		my_controllerPID->P = 1.0e9;
+//		my_controllerPID->D = 1.0e8;
+//		my_controllerPID->I = 1.0e8;
+//		ChSharedPtr<ChForce> pullingForce = ChSharedPtr<ChForce>(new ChForce);
+//		pullingForce->SetMode(FTYPE_FORCE); // no need for this. It is the default option.
+//		shipPtr->AddForce(pullingForce);
+//		// ** or: hydroForce = ChSharedPtr<ChForce>(new ChForce());
+//		pullingForce->SetName(forceTag);
+//		pullingForce->SetVpoint(shipPtr->GetPos());
+//		pullingForce->SetMforce(0);
+//		pullingForce->SetDir(ChVector<>(1,0,0));
 //	}
-//    ChSharedPtr<ChControllerPID> my_controllerPID(new ChControllerPID);
-//    my_controllerPID->P = 1.0e9;
-//    my_controllerPID->D = 1.0e8;
-//    my_controllerPID->I = 1.0e8;
-//
-//    double forcePID_X = my_controllerPID->Get_Out(shipPtr->GetBody()->GetPos().z - shipInitialPosZ - shipVelocity * (mphysicalSystem.GetChTime() - timePause), mphysicalSystem.GetChTime());
-//    char forceTag[] = "pulling_force";
+//	// Arman: check PID syntax. Do you need some velocity stuff?
+//	double forcePID_X = my_controllerPID->Get_Out(shipPtr->GetBody()->GetPos().z - shipInitialPosZ - shipVelocity * (mphysicalSystem.GetChTime() - timePause), mphysicalSystem.GetChTime());
 //	ChSharedPtr<ChForce> pullingForce = shipPtr->GetBody()->SearchForce(forceTag);
 //	pullingForce->SetMforce(forcePID_X);
 //	pullingForce->SetDir(ChVector<>(0,0,-1));
-}
-
-void FixShip(ChSystemParallelDVI& mphysicalSystem) {
-	shipPtr->SetPos_dt(ChVector<>(0,0,0));
-}
+//}
  
 int main(int argc, char* argv[])
 { 
@@ -618,6 +640,7 @@ int main(int argc, char* argv[])
 
 	// Create all the rigid bodies.
 	create_ice_particles(mphysicalSystem);
+	Add_ship_ground_prismatic(mphysicalSystem);
 
 #ifdef CHRONO_PARALLEL_HAS_OPENGL2
    opengl::ChOpenGLWindow &gl_window = opengl::ChOpenGLWindow::getInstance();
@@ -678,10 +701,11 @@ int main(int argc, char* argv[])
 		mphysicalSystem.DoStepDynamics(dT);
 #endif
 #endif
-		if (mphysicalSystem.GetChTime() > timePause) {
-			MoveShip(mphysicalSystem);
+		if (mphysicalSystem.GetChTime() < timePause) {
+			shipPtr->SetBodyFixed(true);
 		} else {
-			FixShip(mphysicalSystem);
+			shipPtr->SetBodyFixed(false);
+			MoveShip_Kinematic(mphysicalSystem);
 		}
 		//******************** ship force*********************
 //		ChVector<> shipForce = shipPtr->GetBody()->Get_Xforce();
