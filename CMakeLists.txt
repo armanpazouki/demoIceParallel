@@ -50,7 +50,7 @@ SET(DEMOS "")
 
 SET(DEMOS ${DEMOS}
     	test_mixerDVI
-	iceParallel
+	iceParallel	
 )
 
 FOREACH(PROGRAM ${DEMOS})

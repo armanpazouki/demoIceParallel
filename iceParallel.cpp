@@ -326,12 +326,8 @@ void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChSharedBodyPtr mrigidBo
 	ballMat->SetComplianceT(0.0);
 	ballMat->SetDampingF(0.2);
 	mrigidBody->SetMaterialSurface(ballMat);
-//		mrigidBody->GetMaterialSurface()->SetFriction(0.4f);
-//		mrigidBody->GetMaterialSurface()->SetCompliance(0.0);
-//		mrigidBody->GetMaterialSurface()->SetComplianceT(0.0);
-//		mrigidBody->GetMaterialSurface()->SetDampingF(0.2);
-//
-//		mrigidBody->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
+
+	//		mrigidBody->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
 	mrigidBody->GetCollisionModel()->ClearModel();
 	utils::AddSphereGeometry(mrigidBody.get_ptr(), mradius);
 	mrigidBody->GetCollisionModel()->BuildModel();
@@ -453,10 +449,11 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 //			boxMin, boxMax,
 //			global_x, global_y, global_z,
 //			expandR, mmass,	minert);
-	GenerateIceLayers_Hexagonal(mphysicalSystem,
-			boxMin, boxMax,
-			global_x, global_y, global_z,
-			expandR, mmass,	minert);
+
+//	GenerateIceLayers_Hexagonal(mphysicalSystem,
+//			boxMin, boxMax,
+//			global_x, global_y, global_z,
+//			expandR, mmass,	minert);
 
 	//**************** bin and ship
 	// IDs for the two bodies
@@ -481,9 +478,7 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	bin->SetRot(ChQuaternion<>(1, 0, 0, 0));
 	bin->SetCollide(true);
 	bin->SetBodyFixed(true);
-
 	bin->GetCollisionModel()->ClearModel();
-	//utils::AddBoxGeometry(bin.get_ptr(), ChVector<>(110,1,110), ChVector<>(0, -10, 0)); //earth, not necessary
 
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hdim.x, hdim.y, hthick), ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));	//end wall
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
@@ -532,15 +527,17 @@ void Add_ship_ground_prismatic(ChSystemParallelDVI& mphysicalSystem) {
 }
 
 void Add_Actuator(ChSystemParallelDVI& mphysicalSystem) {
-	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
+//	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
 	ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0.0, shipVelocity));
 	ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
 	double offsetDist = -1;
 	ChVector<> pt1(0, 0, 0);
 	ChVector<> pt2 = pt1 + ChVector<>(0, 0, offsetDist);
-	actuator->Initialize(shipPtr, bin, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
+	actuator->Initialize(shipPtr, bin, ChCoordsys<>(pt1, QUNIT));
+
+//	actuator->Initialize(shipPtr, bin, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
 	actuator->SetName("actuator");
-	actuator->Set_lin_offset(offsetDist);
+	actuator->Set_lin_offset(0);
 	actuator->Set_dist_funct(actuator_fun);
 	mphysicalSystem.AddLink(actuator);
 	//*** avoid infinite acceleration
@@ -601,7 +598,6 @@ int main(int argc, char* argv[])
 	// ***** params
 	double gravity = 9.81;
 	double dT = 0.1* mradius / shipVelocity; //moving 0.1*R at each time step
-//	double time_step = 1e-3;
 	double time_end = 100;
 	double out_fps = 50;
 	uint max_iteration = 1000;//10000;
@@ -644,7 +640,7 @@ int main(int argc, char* argv[])
 
 	//******************* Irrlicht and driver types **************************
 #define irrlichtVisualization true
-	driveType = ACTUATOR;
+	driveType = ACTUATOR;//KINEMATIC : ACTUATOR
 	//************************************************************************
 	outSimulationInfo << "****************************************************************************" << endl;
 	outSimulationInfo << "dT: " << dT <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
@@ -695,9 +691,32 @@ int main(int argc, char* argv[])
 
 	outSimulationInfo << "***** number of bodies: " << mphysicalSystem.Get_bodylist()->size() << endl;
 	bool moveTime = false;
+
+
+	//****************************************** Time Loop *************************************
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
 		myTimer.start();
+		// ****** include force or motion ********
+		if (mphysicalSystem.GetChTime() < timePause) {
+			shipPtr->SetBodyFixed(true);
+//			FixShip(mphysicalSystem);
+		} else {
+			shipPtr->SetBodyFixed(false);
+
+			switch (driveType) {
+			case KINEMATIC:
+				MoveShip_Kinematic(mphysicalSystem);
+				break;
+			case ACTUATOR:
+				if (!moveTime) {
+					moveTime = true;
+					Add_Actuator(mphysicalSystem);
+					actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
+				}
+			}
+		}
+		// ****** end of force or motion *********
 #if irrlichtVisualization
 		if ( !(application.GetDevice()->run()) ) break;
 		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
@@ -716,25 +735,8 @@ int main(int argc, char* argv[])
 		mphysicalSystem.DoStepDynamics(dT);
 #endif
 #endif
-		if (mphysicalSystem.GetChTime() < timePause) {
-			FixShip(mphysicalSystem);
-		} else {
-			switch (driveType) {
-			case KINEMATIC:
-				MoveShip_Kinematic(mphysicalSystem);
-				break;
-			case ACTUATOR:
-				if (!moveTime) {
-					moveTime = true;
-					Add_Actuator(mphysicalSystem);
-					actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
-				}
-			}
-		}
-		//******************** ship force*********************
-//		ChVector<> shipForce = shipPtr->GetBody()->Get_Xforce();
-//		printf("force %f\n",shipForce.z);
 
+		//******************** ship force*********************
 		ChVector<> mForce;
 		ChVector<> mTorque;
 		if (actuator.IsNull()) {
@@ -744,7 +746,6 @@ int main(int argc, char* argv[])
 			mTorque = actuator->Get_react_torque();
 		}
 		ChVector<> icePressure = mForce / (numLayers * 2 * mradius * cos(CH_C_PI / 6)) / ship_width;
-
 
 		myTimer.stop();
 		//****************************************************
