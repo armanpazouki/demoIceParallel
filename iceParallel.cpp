@@ -756,8 +756,13 @@ int main(int argc, char* argv[])
 		outData.close();
 
 		double numIter = ((ChLcpSolverParallelDVI*)mphysicalSystem.GetLcpSolverSpeed())->GetTotalIterations();
-		outSimulationInfo << "Time: " <<  mphysicalSystem.GetChTime() << " energy: " << energy <<
-				" time per step: " << myTimer() << " forceMagnitude: " << mForce.Length() << " number of Iteration: " << numIter << endl;
+		outSimulationInfo << "Time: " <<  mphysicalSystem.GetChTime() <<
+				" Ship pos: " << shipPtr->GetPos().x << ", " << shipPtr->GetPos().y << ", " <<  shipPtr->GetPos().z <<
+				" Ship vel: " << shipPtr->GetPos_dt().x << ", " << shipPtr->GetPos_dt().y << ", " <<  shipPtr->GetPos_dt().z <<
+				" energy: " << energy <<
+				" time per step: " << myTimer() <<
+				" Ship force: " << mForce.x << ", " << mForce.y << ", " <<  mForce.z <<
+				" number of Iteration: " << numIter << endl;
 		printf("Time %f, shipX %f %f %f, shipV %f %f %f, energy %f, time per step %f, dT %f, forceX Y Z %f, %f, %f, number of Iteration %f\n",
 				mphysicalSystem.GetChTime(),
 				shipPtr->GetPos().x, shipPtr->GetPos().y, shipPtr->GetPos().z,
