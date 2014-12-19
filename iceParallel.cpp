@@ -29,7 +29,18 @@
 // ------------------------------------------------ 
 ///////////////////////////////////////////////////
     
-  
+//#include "lcp/ChLcpIterativeMINRES.h" // test
+//#include "physics/ChSystem.h"
+//#include "physics/ChBodyEasy.h"
+//#include "physics/ChContactContainer.h"
+//#include "collision/ChCModelBulletBody.h"
+////#include "core/ChTimer.h"
+////#include "core/ChRealtimeStep.h"
+////#include "assets/ChTexture.h"
+//#include "unit_IRRLICHT/ChIrrApp.h"
+//#include <cstring>
+//#include <fstream>
+//#include <sstream>
  
 //#include "physics/ChBodyEasy.h"
 #include "physics/ChContactContainer.h"
@@ -495,6 +506,8 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
 	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
 	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
+	printf("mass %f I1 I2 I3 %f %f %f\n", boxMass, bI1, bI2, bI3);
+
 	shipInitialPosZ = boxMin.z - .5 * box_Z;
 
 	shipPtr = ChSharedBodyPtr(new ChBody(new ChCollisionModelParallel));
@@ -531,13 +544,13 @@ void Add_Actuator(ChSystemParallelDVI& mphysicalSystem) {
 //	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
 	ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0, -shipVelocity));
 	ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
-	ChVector<> pt1(0, 0, 0);
-	ChVector<> pt2(0, 0, 0);
+	ChVector<> pt1 = shipPtr->GetPos();
+	ChVector<> pt2 = pt1 + ChVector<>(0, 0, 1000); //a large number in the z direction
 //	actuator->Initialize(shipPtr, bin, ChCoordsys<>(pt1, QUNIT));
 
-	actuator->Initialize(bin, shipPtr, true, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
+	actuator->Initialize(shipPtr, bin, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
 	actuator->SetName("actuator");
-	actuator->Set_lin_offset((bin->GetPos() - shipPtr->GetPos()).Length());
+	actuator->Set_lin_offset((pt2 - pt1).Length());
 	actuator->Set_dist_funct(actuator_fun);
 	mphysicalSystem.AddLink(actuator);
 	//*** avoid infinite acceleration
@@ -654,10 +667,10 @@ int main(int argc, char* argv[])
 	create_ice_particles(mphysicalSystem);
 	Add_ship_ground_prismatic(mphysicalSystem);
 	ChSharedPtr<ChLinkLinActuator> actuator;
-	//dummy for now
-	Add_Actuator(mphysicalSystem);
-	actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
-	//
+//	//dummy for now
+//	Add_Actuator(mphysicalSystem);
+//	actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
+//	//
 
 #ifdef CHRONO_PARALLEL_HAS_OPENGL2
    opengl::ChOpenGLWindow &gl_window = opengl::ChOpenGLWindow::getInstance();
@@ -697,30 +710,29 @@ int main(int argc, char* argv[])
 
 	outSimulationInfo << "***** number of bodies: " << mphysicalSystem.Get_bodylist()->size() << endl;
 	bool moveTime = false;
-
 	//****************************************** Time Loop *************************************
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
 		myTimer.start();
 		// ****** include force or motion ********
-//		if (mphysicalSystem.GetChTime() < timePause) {
-//			shipPtr->SetBodyFixed(true);
-////			FixShip(mphysicalSystem);
-//		} else {
-//			shipPtr->SetBodyFixed(false);
-//
-//			switch (driveType) {
-//			case KINEMATIC:
-//				MoveShip_Kinematic(mphysicalSystem);
-//				break;
-//			case ACTUATOR:
-//				if (!moveTime) {
-//					moveTime = true;
-//					Add_Actuator(mphysicalSystem);
-//					actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
-//				}
-//			}
-//		}
+		if (mphysicalSystem.GetChTime() < timePause) {
+			shipPtr->SetBodyFixed(true);
+//			FixShip(mphysicalSystem);
+		} else {
+			shipPtr->SetBodyFixed(false);
+
+			switch (driveType) {
+			case KINEMATIC:
+				MoveShip_Kinematic(mphysicalSystem);
+				break;
+			case ACTUATOR:
+				if (!moveTime) {
+					moveTime = true;
+					Add_Actuator(mphysicalSystem);
+					actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
+				}
+			}
+		}
 		// ****** end of force or motion *********
 #if irrlichtVisualization
 		if ( !(application.GetDevice()->run()) ) break;
@@ -778,7 +790,11 @@ int main(int argc, char* argv[])
 		double numIter = ((ChLcpSolverParallelDVI*)mphysicalSystem.GetLcpSolverSpeed())->GetTotalIterations();
 		outSimulationInfo << "Time: " <<  mphysicalSystem.GetChTime() << " energy: " << energy <<
 				" time per step: " << myTimer() << " forceMagnitude: " << mForce.Length() << " number of Iteration: " << numIter << endl;
-		printf("Time %f, energy %f, time per step %f, forceX Y Z %f, %f, %f, number of Iteration %f\n", mphysicalSystem.GetChTime(), energy, myTimer(), mForce.x, mForce.y, mForce.z, numIter);
+		printf("Time %f, shipX %f %f %f, shipV %f %f %f, energy %f, time per step %f, dT %f, forceX Y Z %f, %f, %f, number of Iteration %f\n",
+				mphysicalSystem.GetChTime(),
+				shipPtr->GetPos().x, shipPtr->GetPos().y, shipPtr->GetPos().z,
+				shipPtr->GetPos_dt().x, shipPtr->GetPos_dt().y, shipPtr->GetPos_dt().z, energy, myTimer(),
+				 mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, numIter);
 
 	}
 
