@@ -27,21 +27,7 @@
 // ------------------------------------------------ 
 //             www.deltaknowledge.com
 // ------------------------------------------------ 
-///////////////////////////////////////////////////
-    
-//#include "lcp/ChLcpIterativeMINRES.h" // test
-//#include "physics/ChSystem.h"
-//#include "physics/ChBodyEasy.h"
-//#include "physics/ChContactContainer.h"
-//#include "collision/ChCModelBulletBody.h"
-////#include "core/ChTimer.h"
-////#include "core/ChRealtimeStep.h"
-////#include "assets/ChTexture.h"
-//#include "unit_IRRLICHT/ChIrrApp.h"
-//#include <cstring>
-//#include <fstream>
-//#include <sstream>
- 
+
 //#include "physics/ChBodyEasy.h"
 #include "physics/ChContactContainer.h"
 #include "collision/ChCModelBulletBody.h"
@@ -85,6 +71,7 @@ using namespace std;
 
 const double rhoF = 1000;
 const double rhoR = 917;
+const double rhoPlate = 1000;
 const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
@@ -214,25 +201,6 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysica
 	}
 }
 //**********************************
-//void ConnectShearBox(ChSystemParallel* system, ChSharedPtr<ChBody> ground, ChSharedPtr<ChBody> box)
-//{
-//  ChSharedPtr<ChLinkLockPrismatic> prismatic(new ChLinkLockPrismatic);
-//  prismatic->Initialize(ground, box, ChCoordsys<>(ChVector<>(0, 0, 2 * hdimZ), Q_from_AngY(CH_C_PI_2)));
-//  prismatic->SetName("prismatic_box_ground");
-//  system->AddLink(prismatic);
-//
-//  ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0.0, desiredVelocity));
-//
-//  ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
-//  ChVector<> pt1(0, 0, 2 * hdimZ);
-//  ChVector<> pt2(1, 0, 2 * hdimZ);
-//  actuator->Initialize(ground, box, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
-//  actuator->SetName("actuator");
-//  actuator->Set_lin_offset(1);
-//  actuator->Set_dist_funct(actuator_fun);
-//  system->AddLink(actuator);
-//}
-
 void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> & mForce, ChVector<> & mTorque) {
 	mForce = ChVector<>(0,0,0);
 	mTorque = ChVector<>(0,0,0);
@@ -461,10 +429,10 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 //			global_x, global_y, global_z,
 //			expandR, mmass,	minert);
 
-//	GenerateIceLayers_Hexagonal(mphysicalSystem,
-//			boxMin, boxMax,
-//			global_x, global_y, global_z,
-//			expandR, mmass,	minert);
+	GenerateIceLayers_Hexagonal(mphysicalSystem,
+			boxMin, boxMax,
+			global_x, global_y, global_z,
+			expandR, mmass,	minert);
 
 	//**************** bin and ship
 	// IDs for the two bodies
@@ -496,13 +464,13 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
-//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
 	bin->GetCollisionModel()->BuildModel();
 
 	mphysicalSystem.AddBody(bin);
 
 	//**************** create ship
-	double boxMass = rhoR * box_X * box_Y * box_Z;
+	double boxMass = rhoPlate * box_X * box_Y * box_Z;
 	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
 	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
 	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
@@ -650,8 +618,8 @@ int main(int argc, char* argv[])
 
 	mphysicalSystem.GetSettings()->collision.collision_envelope = collisionEnvelop;
 	mphysicalSystem.GetSettings()->collision.bins_per_axis = I3(10, 10, 10); //Arman check
-	mphysicalSystem.GetSettings()->collision.min_body_per_bin = 50;			// Arman check
-	mphysicalSystem.GetSettings()->collision.max_body_per_bin = 100;		// Arman check
+//	mphysicalSystem.GetSettings()->collision.min_body_per_bin = 50;		// Arman check: According to Hammad these are not used anymore
+//	mphysicalSystem.GetSettings()->collision.max_body_per_bin = 100;	// Arman check: According to Hammad these are not used anymore
 
 	//******************* Irrlicht and driver types **************************
 #define irrlichtVisualization true
