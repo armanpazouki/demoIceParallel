@@ -90,7 +90,7 @@ ChSharedBodyPtr shipPtr;
 ChSharedBodyPtr bin;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
-const double timePause = 0;//0.2; //arman modify
+const double timePause = 1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
 const double timeMove = 2.5;
 double ship_width = 4;
 double box_X = ship_width, box_Y = 10, box_Z = .4;
@@ -497,7 +497,6 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	mphysicalSystem.Add(shipPtr);
 }
 
-
 //***** prismatic constraint between ship and bed
 void Add_ship_ground_prismatic(ChSystemParallelDVI& mphysicalSystem) {
 	ChSharedPtr<ChLinkLockPrismatic> shipGroundPrismatic(new ChLinkLockPrismatic);
@@ -508,35 +507,43 @@ void Add_ship_ground_prismatic(ChSystemParallelDVI& mphysicalSystem) {
 	mphysicalSystem.AddLink(shipGroundPrismatic);
 }
 
-void Add_Actuator(ChSystemParallelDVI& mphysicalSystem) {
-//	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
-	ChSharedPtr<ChFunction_Ramp> actuator_fun(new ChFunction_Ramp(0, -shipVelocity));
-	ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
-	ChVector<> pt1 = shipPtr->GetPos();
-	ChVector<> pt2 = pt1 + ChVector<>(0, 0, 1000); //a large number in the z direction
-//	actuator->Initialize(shipPtr, bin, ChCoordsys<>(pt1, QUNIT));
-
-	actuator->Initialize(shipPtr, bin, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
-	actuator->SetName("actuator");
-	actuator->Set_lin_offset((pt2 - pt1).Length());
-	actuator->Set_dist_funct(actuator_fun);
-	mphysicalSystem.AddLink(actuator);
-	//*** avoid infinite acceleration
-
-
-}
-
-void MoveShip_Kinematic(ChSystemParallelDVI& mphysicalSystem) {
+void MoveShip_Kinematic(double dT) {
 	ChVector<> shipVel = ChVector<>(0,0,shipVelocity);
-	ChVector<> shipPos = shipInitialPos + shipVel * (mphysicalSystem.GetChTime() - timePause);
+	ChVector<> shipPos = shipInitialPos + shipVel * (dT - timePause);
 	shipPtr->SetPos(shipPos);
 	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
 	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
 	shipPtr->SetWvel_loc(ChVector<>(0,0,0));
 }
 
-void FixShip(ChSystemParallelDVI& mphysicalSystem) {
+void FixShip_Kinematic() {
 	shipPtr->SetPos_dt(ChVector<>(0,0,0));
+}
+
+void Add_Actuator(ChSystemParallelDVI& mphysicalSystem) {
+//	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
+	ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
+	ChVector<> pt1 = shipPtr->GetPos();
+	ChVector<> pt2 = pt1 + ChVector<>(0, 0, 1000); //a large number in the z direction
+	actuator->Initialize(shipPtr, bin, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
+	actuator->SetName("actuator");
+	actuator->Set_lin_offset((pt2 - pt1).Length());
+	mphysicalSystem.AddLink(actuator);
+	//*** avoid infinite acceleration
+
+
+}
+
+void MoveShip_Actuator(
+		ChSystemParallelDVI& mphysicalSystem,
+		ChSharedPtr<ChFunction> actuator_fun,
+		int path_piece) {
+	static int interval = -1;
+	if (path_piece == interval) return;
+	ChSharedPtr<ChLinkLinActuator> actuator;
+	actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
+	actuator->Set_dist_funct(actuator_fun);
+	interval = path_piece;
 }
 
 //void MoveShip_PID(ChSystemParallelDVI& mphysicalSystem) {
@@ -634,11 +641,6 @@ int main(int argc, char* argv[])
 	// Create all the rigid bodies.
 	create_ice_particles(mphysicalSystem);
 	Add_ship_ground_prismatic(mphysicalSystem);
-	ChSharedPtr<ChLinkLinActuator> actuator;
-//	//dummy for now
-//	Add_Actuator(mphysicalSystem);
-//	actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
-//	//
 
 #ifdef CHRONO_PARALLEL_HAS_OPENGL2
    opengl::ChOpenGLWindow &gl_window = opengl::ChOpenGLWindow::getInstance();
@@ -671,7 +673,7 @@ int main(int argc, char* argv[])
 		application.SetStepManage(true);
 		application.SetTimestep(dT);  					//Arman modify
 #endif
-		outForceData << "time, forceX, forceY, forceZ, forceMag, pressureX, pressureY, pressureZ, pressureMag, shipVelocity, shipPosition, energy, timePerStep.## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
+		outForceData << "time, force (x, y, z, magnitude), Ice pressure (x, y, z, magnitude), shipPos, shipVel, energy, iceThickness, timePerStep. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 		outForceData.close();
 		outSimulationInfo << "Real Time, Compute Time" << endl;
@@ -679,27 +681,26 @@ int main(int argc, char* argv[])
 	outSimulationInfo << "***** number of bodies: " << mphysicalSystem.Get_bodylist()->size() << endl;
 	bool moveTime = false;
 	//****************************************** Time Loop *************************************
+	ChSharedPtr<ChFunction_Const> actuator_fun0(new ChFunction_Const(0));
+	ChSharedPtr<ChFunction_Ramp> actuator_fun1(new ChFunction_Ramp(0, -shipVelocity));
+	if (driveType == ACTUATOR) {
+		Add_Actuator(mphysicalSystem);
+	}
+
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
 		myTimer.start();
 		// ****** include force or motion ********
-		if (mphysicalSystem.GetChTime() < timePause) {
-			shipPtr->SetBodyFixed(true);
-//			FixShip(mphysicalSystem);
-		} else {
-			shipPtr->SetBodyFixed(false);
-
-			switch (driveType) {
-			case KINEMATIC:
-				MoveShip_Kinematic(mphysicalSystem);
-				break;
-			case ACTUATOR:
-				if (!moveTime) {
-					moveTime = true;
-					Add_Actuator(mphysicalSystem);
-					actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
-				}
-			}
+		switch (driveType) {
+		case KINEMATIC:
+			(mphysicalSystem.GetChTime() < timePause) ?
+				FixShip_Kinematic() :
+				MoveShip_Kinematic(mphysicalSystem.GetChTime());
+			break;
+		case ACTUATOR:
+			(mphysicalSystem.GetChTime() < timePause) ?
+				MoveShip_Actuator(mphysicalSystem, actuator_fun0.StaticCastTo<ChFunction>(), 0) :
+				MoveShip_Actuator(mphysicalSystem, actuator_fun1.StaticCastTo<ChFunction>(), 1);
 		}
 		// ****** end of force or motion *********
 #if irrlichtVisualization
@@ -724,13 +725,16 @@ int main(int argc, char* argv[])
 		//******************** ship force*********************
 		ChVector<> mForce;
 		ChVector<> mTorque;
-		if (actuator.IsNull()) {
-			calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
-		} else {
+		if (driveType == ACTUATOR) {
+			ChSharedPtr<ChLinkLinActuator> actuator;
+			actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
 			mForce = actuator->Get_react_force();
 			mTorque = actuator->Get_react_torque();
+		} else {
+			calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
 		}
-		ChVector<> icePressure = mForce / (numLayers * 2 * mradius * cos(CH_C_PI / 6)) / ship_width;
+		double iceThickness = numLayers * 2 * mradius * cos(CH_C_PI / 6.0);
+		ChVector<> icePressure = mForce / iceThickness / ship_width;
 
 		myTimer.stop();
 		//****************************************************
@@ -750,7 +754,7 @@ int main(int argc, char* argv[])
 		outDataSS << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
 				mForce.Length() << ", " <<
 				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
-				shipPtr->GetPos_dt().z << ", " << shipPtr->GetPos().z << ", " << energy << ", " << myTimer() << endl;
+				shipPtr->GetPos().z << ", " << shipPtr->GetPos_dt().z << ", " << energy << ", " << iceThickness  << ", " << myTimer() << endl;
 		ofstream outData("forceData.txt", ios::app);
 		outData<<outDataSS.str();
 		outData.close();
@@ -762,12 +766,13 @@ int main(int argc, char* argv[])
 				" energy: " << energy <<
 				" time per step: " << myTimer() <<
 				" Ship force: " << mForce.x << ", " << mForce.y << ", " <<  mForce.z <<
+				" ice thickness: " << iceThickness <<
 				" number of Iteration: " << numIter << endl;
-		printf("Time %f, shipX %f %f %f, shipV %f %f %f, energy %f, time per step %f, dT %f, forceX Y Z %f, %f, %f, number of Iteration %f\n",
+		printf("Time %f, shipX %f %f %f, shipV %f %f %f, energy %f, time per step %f, dT %f, forceX Y Z %f, %f, %f, ice thickness %f, number of Iteration %f\n",
 				mphysicalSystem.GetChTime(),
 				shipPtr->GetPos().x, shipPtr->GetPos().y, shipPtr->GetPos().z,
 				shipPtr->GetPos_dt().x, shipPtr->GetPos_dt().y, shipPtr->GetPos_dt().z, energy, myTimer(),
-				 mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, numIter);
+				 mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, iceThickness, numIter);
 
 	}
 
