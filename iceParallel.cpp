@@ -81,7 +81,7 @@ enum DriveType {
 };
 DriveType driveType;
 //******************* ship and sphere stuff
-double mradius = .3;
+double mradius = .4;
 int numLayers = 1;
 
 //ChBodySceneNode* shipPtr;
@@ -574,9 +574,11 @@ void MoveShip_Actuator(
  
 int main(int argc, char* argv[])
 { 
-	ChTimer<double> myTimer;
+	ChTimer<double> myTimerTotal;
+	ChTimer<double> myTimerStep;
 	int threads = 2;
 
+	myTimerTotal.start();
 	ofstream outSimulationInfo("SimInfo.txt");
 
 	if (argc > 1) {
@@ -587,10 +589,10 @@ int main(int argc, char* argv[])
 
 	// ***** params
 	double gravity = 9.81;
-	double dT = 0.1* mradius / shipVelocity; //moving 0.1*R at each time step
+	double dT = 0.05* mradius / shipVelocity; //moving 0.1*R at each time step
 	double time_end = 100;
 	double out_fps = 50;
-	uint max_iteration = 1000;//10000;
+	uint max_iteration = 5000;//10000;
 	double tolerance = 1e-3;
 	// ************
 
@@ -673,7 +675,7 @@ int main(int argc, char* argv[])
 		application.SetStepManage(true);
 		application.SetTimestep(dT);  					//Arman modify
 #endif
-		outForceData << "time, force (x, y, z, magnitude), Ice pressure (x, y, z, magnitude), shipPos, shipVel, energy, iceThickness, timePerStep. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
+		outForceData << "time, forceContact (x, y, z, magnitude), forceActuator (x, y, z, magnitude), Ice pressure contact (x, y, z, magnitude), Ice pressure actuator (x, y, z, magnitude), shipPos, shipVel, energy, iceThickness, timePerStep, timeElapsed. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
 		outForceData.close();
 		outSimulationInfo << "Real Time, Compute Time" << endl;
@@ -689,7 +691,7 @@ int main(int argc, char* argv[])
 
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
-		myTimer.start();
+		myTimerStep.start();
 		// ****** include force or motion ********
 		switch (driveType) {
 		case KINEMATIC:
@@ -723,20 +725,26 @@ int main(int argc, char* argv[])
 #endif
 
 		//******************** ship force*********************
-		ChVector<> mForce;
-		ChVector<> mTorque;
+		double iceThickness = numLayers * 2 * mradius * cos(CH_C_PI / 6.0);
+		ChVector<> mForceActuator = ChVector<>(0,0,0);
+		ChVector<> mTorqueActuator = ChVector<>(0,0,0);
+		ChVector<> icePressureActuator = ChVector<>(0,0,0);
+		ChVector<> mTorqueContact;
+		ChVector<> mForceContact;
+
+
 		if (driveType == ACTUATOR) {
 			ChSharedPtr<ChLinkLinActuator> actuator;
 			actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
-			mForce = actuator->Get_react_force();
-			mTorque = actuator->Get_react_torque();
-		} else {
-			calc_ship_contact_forces(mphysicalSystem, mForce, mTorque);
+			mForceActuator = actuator->Get_react_force();
+			mTorqueActuator = actuator->Get_react_torque();
+			icePressureActuator = mForceActuator / iceThickness / ship_width;
 		}
-		double iceThickness = numLayers * 2 * mradius * cos(CH_C_PI / 6.0);
-		ChVector<> icePressure = mForce / iceThickness / ship_width;
+		calc_ship_contact_forces(mphysicalSystem, mForceContact, mTorqueContact);
+		ChVector<> icePressureContact = mForceContact / iceThickness / ship_width;
 
-		myTimer.stop();
+		myTimerStep.stop();
+		myTimerTotal.stop();
 		//****************************************************
 //		for(int i=0; i<mphysicalSystem.Get_bodylist()->size(); i++){
 //			create_hydronynamic_force(mphysicalSystem.Get_bodylist()->at(i), mphysicalSystem, surfaceLoc, false);
@@ -751,10 +759,12 @@ int main(int argc, char* argv[])
 		}
 
 		stringstream outDataSS;
-		outDataSS << mphysicalSystem.GetChTime() << ", " << mForce.x << ", " << mForce.y << ", " << mForce.z << ", " <<
-				mForce.Length() << ", " <<
-				icePressure.x << ", " << icePressure.y << ", " << icePressure.z << ", " << icePressure.Length() << ", " <<
-				shipPtr->GetPos().z << ", " << shipPtr->GetPos_dt().z << ", " << energy << ", " << iceThickness  << ", " << myTimer() << endl;
+		outDataSS << mphysicalSystem.GetChTime() << ", " <<
+				mForceContact.x << ", " << mForceContact.y << ", " << mForceContact.z << ", " << mForceContact.Length() << ", " <<
+				mForceActuator.x << ", " << mForceActuator.y << ", " << mForceActuator.z << ", " << mForceActuator.Length() << ", " <<
+				icePressureContact.x << ", " << icePressureContact.y << ", " << icePressureContact.z << ", " << icePressureContact.Length() << ", " <<
+				icePressureActuator.x << ", " << icePressureActuator.y << ", " << icePressureActuator.z << ", " << icePressureActuator.Length() << ", " <<
+				shipPtr->GetPos().z << ", " << shipPtr->GetPos_dt().z << ", " << energy << ", " << iceThickness  << ", " << myTimerStep() << ", " << myTimerTotal() << endl;
 		ofstream outData("forceData.txt", ios::app);
 		outData<<outDataSS.str();
 		outData.close();
@@ -764,15 +774,19 @@ int main(int argc, char* argv[])
 				" Ship pos: " << shipPtr->GetPos().x << ", " << shipPtr->GetPos().y << ", " <<  shipPtr->GetPos().z <<
 				" Ship vel: " << shipPtr->GetPos_dt().x << ", " << shipPtr->GetPos_dt().y << ", " <<  shipPtr->GetPos_dt().z <<
 				" energy: " << energy <<
-				" time per step: " << myTimer() <<
-				" Ship force: " << mForce.x << ", " << mForce.y << ", " <<  mForce.z <<
+				" time per step: " << myTimerStep() <<
+				" time elapsed: " << myTimerTotal() <<
+				" Ship force: " << mForceContact.x << ", " << mForceContact.y << ", " <<  mForceContact.z <<
 				" ice thickness: " << iceThickness <<
 				" number of Iteration: " << numIter << endl;
-		printf("Time %f, shipX %f %f %f, shipV %f %f %f, energy %f, time per step %f, dT %f, forceX Y Z %f, %f, %f, ice thickness %f, number of Iteration %f\n",
-				mphysicalSystem.GetChTime(),
-				shipPtr->GetPos().x, shipPtr->GetPos().y, shipPtr->GetPos().z,
-				shipPtr->GetPos_dt().x, shipPtr->GetPos_dt().y, shipPtr->GetPos_dt().z, energy, myTimer(),
-				 mphysicalSystem.GetChTime(), mForce.x, mForce.y, mForce.z, iceThickness, numIter);
+		cout << "Time: " <<  mphysicalSystem.GetChTime() <<
+				" Ship vel: " << shipPtr->GetPos_dt().x << ", " << shipPtr->GetPos_dt().y << ", " <<  shipPtr->GetPos_dt().z <<
+				" energy: " << energy <<
+				" time per step: " << myTimerStep() <<
+				" time elapsed: " << myTimerTotal() <<
+				" Ship force: " << mForceContact.x << ", " << mForceContact.y << ", " <<  mForceContact.z <<
+				" ice thickness: " << iceThickness <<
+				" number of Iteration: " << numIter << endl;
 
 	}
 
