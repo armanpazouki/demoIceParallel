@@ -38,6 +38,8 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <time.h>
+#include <cstdlib>
 //#include <map>
 
 //*************** chrono parallel
@@ -48,8 +50,9 @@
 #include "chrono_parallel/physics/ChSystemParallel.h"
 #include "chrono_parallel/lcp/ChLcpSystemDescriptorParallel.h"
 
-#include "chrono_utils/ChUtilsCreators.h"
-#include "chrono_utils/ChUtilsInputOutput.h"
+#include "chrono_utils/ChUtilsCreators.h"  //Arman: why is this
+#include "chrono_utils/ChUtilsInputOutput.h" //Arman: Why is this
+#include "chrono_utils/ChUtilsGenerators.h"
 
 #ifdef CHRONO_PARALLEL_HAS_OPENGL2
 #include "chrono_opengl/ChOpenGLWindow.h"
@@ -72,6 +75,8 @@ using namespace std;
 const double rhoF = 1000;
 const double rhoR = 917;
 const double rhoPlate = 1000;
+const double porosity = .35; //set value of porosity
+const double minPorosity = 0.2595;
 const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
@@ -92,12 +97,19 @@ const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
 const double timePause = 1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
 const double timeMove = 2.5;
-double ship_width = 4;
-double box_X = ship_width, box_Y = 10, box_Z = .4;
+const double ship_width = 4;
+const double box_X = ship_width, box_Y = 10, box_Z = .4;
 double collisionEnvelop = .04 * mradius;
 ChVector<> shipInitialPos;
+ChVector<> hdim = ChVector<>(16, 12, 21.2); //domain dimension
+ChVector<> boxMin = ChVector<>(-.8, 0, -2.4); //component y is not really important
 //**********************************
-
+void MySeed(double s = time(NULL)) {
+	 srand(s);
+}
+double MyRand() {
+	return float(rand()) / RAND_MAX;
+}
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
 		ChBody* mrigidBody, ChSystemParallelDVI& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
 	F_Hydro = ChVector<>(0,0,0);
@@ -379,6 +391,8 @@ void addHCPSheet(
 
 		ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
 		ChVector<> pos = ChVector<>(x, height, z);
+//		cout << "myrand " << MyRand() << endl;
+//		if (MyRand() > (porosity - minPorosity) / (1 - minPorosity) ) CreateSphere(mphysicalSystem, mrigidBody, pos, mmass, minert);
 		CreateSphere(mphysicalSystem, mrigidBody, pos, mmass, minert);
       }
     }
@@ -405,6 +419,58 @@ void GenerateIceLayers_Hexagonal(
       addHCPSheet(mphysicalSystem, numColX, numColZ, height + global_y, offset_x+global_x, offset_z+global_z, expandR, mmass, minert);
     }
 }
+
+// =============================================================================
+// Create the Brash Ice
+//
+// Brash Ice consisting of identical spheres with specified radius and
+// material properties; the spheres are generated in a number of vertical
+// layers with locations within each layer obtained using Poisson Disk sampling,
+// or HCP Packing, or Grid based initializaiton, thus ensuring that no two spheres
+// are closer than twice the radius.
+// =============================================================================
+int CreateIceParticles(ChSystemParallel& mphysicalSystem)
+{
+	// -------------------------------------------
+	// Create a material for the granular material
+	// -------------------------------------------
+	ChSharedPtr<ChMaterialSurface> mat_g(new ChMaterialSurface);
+	mat_g->SetFriction(mu_Viscosity);
+
+	// ---------------------------------------------
+	// Create a mixture entirely made out of spheres
+	// ---------------------------------------------
+
+	// Create the particle generator with a mixture of 100% spheres
+	utils::Generator gen(&mphysicalSystem);
+	utils::MixtureIngredientPtr& m1 = gen.AddMixtureIngredient(utils::SPHERE, 1.0);
+	m1->setDefaultMaterialDVI(mat_g);
+	m1->setDefaultDensity(rhoR);
+	m1->setDefaultSize(mradius);
+
+	// Ensure that all generated particle bodies will have positive IDs.
+	int Id_g = 1;
+	gen.setBodyIdentifier(Id_g);
+
+	// ----------------------
+	// Generate the particles
+	// ----------------------
+
+	double expandR = 1.01 * mradius;
+	double iceThickness = numLayers * expandR * 2;
+	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
+	ChVector<> boxMinGranular = ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z);
+//	ChVector<> hdimGranularHalf = 0.5 * hdim - ChVector<>(expandR);
+	ChVector<> hdimGranularHalf = 0.5 * ChVector<>(hdim.x, iceThickness, hdim.z) - ChVector<>(expandR);
+	ChVector<> centerGranular = boxMinGranular + (hdimGranularHalf + ChVector<>(expandR));
+
+	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
+
+	gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf);
+
+	// Return the number of generated particles.
+	return gen.getTotalNumBodies();
+}
 //***********************************
 void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 {
@@ -416,8 +482,6 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 
 	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
 	double minert = (2./5.)* mmass * pow(mradius,2);
-	ChVector<> boxMin = ChVector<>(-.8, 0, -2.4);
-	ChVector<> hdim = ChVector<>(16, 12, 21.2);
 	ChVector<> center = 0.5 * hdim + boxMin;
 	ChVector<> boxMax = boxMin + hdim;
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
@@ -433,6 +497,8 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 			boxMin, boxMax,
 			global_x, global_y, global_z,
 			expandR, mmass,	minert);
+
+//	int totalGranular = CreateIceParticles(mphysicalSystem);
 
 	//**************** bin and ship
 	// IDs for the two bodies
@@ -577,6 +643,7 @@ int main(int argc, char* argv[])
 	ChTimer<double> myTimerTotal;
 	ChTimer<double> myTimerStep;
 	int threads = 2;
+	MySeed(964);
 
 	myTimerTotal.start();
 	ofstream outSimulationInfo("SimInfo.txt");
@@ -675,8 +742,11 @@ int main(int argc, char* argv[])
 		application.SetStepManage(true);
 		application.SetTimestep(dT);  					//Arman modify
 #endif
-		outForceData << "time, forceContact (x, y, z, magnitude), forceActuator (x, y, z, magnitude), Ice pressure contact (x, y, z, magnitude), Ice pressure actuator (x, y, z, magnitude), shipPos, shipVel, energy, iceThickness, timePerStep, timeElapsed. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
-				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << endl;
+		double iceThickness = numLayers * 2 * mradius * cos(CH_C_PI / 6.0);
+		double calculatedPorosity = 1 - (mphysicalSystem.Get_bodylist()->size() - 2) * 4.0 / 3 *CH_C_PI * pow(mradius, 3) /
+				( hdim.x * hdim.z * iceThickness);
+		outForceData << "[1] time, [2-5] forceContact (x, y, z, magnitude), [6-9] forceActuator (x, y, z, magnitude), [10-13] Ice pressure contact (x, y, z, magnitude), [14-17] Ice pressure actuator (x, y, z, magnitude), [18] shipPos, [19] shipVel, [20] energy, [21] iceThickness, [22] timePerStep, [23] timeElapsed. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
+				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << " ship_width: " << ship_width << " set porosity: " << porosity << " calculated porosity: " << calculatedPorosity << endl;
 		outForceData.close();
 		outSimulationInfo << "Real Time, Compute Time" << endl;
 
@@ -725,7 +795,6 @@ int main(int argc, char* argv[])
 #endif
 
 		//******************** ship force*********************
-		double iceThickness = numLayers * 2 * mradius * cos(CH_C_PI / 6.0);
 		ChVector<> mForceActuator = ChVector<>(0,0,0);
 		ChVector<> mTorqueActuator = ChVector<>(0,0,0);
 		ChVector<> icePressureActuator = ChVector<>(0,0,0);
