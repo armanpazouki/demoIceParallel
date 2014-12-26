@@ -86,7 +86,7 @@ enum DriveType {
 };
 DriveType driveType;
 //******************* ship and sphere stuff
-double mradius = .4;
+double mradius = 1;
 int numLayers = 1;
 
 //ChBodySceneNode* shipPtr;
@@ -102,7 +102,7 @@ const double box_X = ship_width, box_Y = 10, box_Z = .4;
 double collisionEnvelop = .04 * mradius;
 ChVector<> shipInitialPos;
 ChVector<> hdim = ChVector<>(16, 12, 21.2); //domain dimension
-ChVector<> boxMin = ChVector<>(-.8, 0, -2.4); //component y is not really important
+ChVector<> boxMin = ChVector<>(-.8, -6, -2.4); //component y is not really important
 //**********************************
 void MySeed(double s = time(NULL)) {
 	 srand(s);
@@ -111,7 +111,7 @@ double MyRand() {
 	return float(rand()) / RAND_MAX;
 }
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
-		ChBody* mrigidBody, ChSystemParallelDVI& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+		ChBody* mrigidBody, ChSystemParallel& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
 	F_Hydro = ChVector<>(0,0,0);
 	forceLoc = ChVector<>(0,0,0);
 	T_Drag = ChVector<>(0,0,0);
@@ -166,7 +166,7 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 	F_Hydro = F_Buoyancy + F_Drag; // it is assumed that F_Drag is applied at the buoyancy center
 }
 //**********************************
-void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation, bool createForce) {
+void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallel& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation, bool createForce) {
 	// ***** insertion of force
 	ChSharedPtr<ChForce> hydroForce;
 	ChSharedPtr<ChForce> hydroTorque;
@@ -199,6 +199,7 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallelDVI& mphysica
 		ChVector<> F_Hydro;
 		ChVector<> forceLoc;
 		ChVector<> T_Drag;
+		printf("force update \n");
 
 		Calc_Hydrodynamics_Forces(F_Hydro, forceLoc, T_Drag, mrigidBody, mphysicalSystem, freeSurfaceLocation);
 
@@ -322,8 +323,6 @@ void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChSharedBodyPtr mrigidBo
 	mrigidBody->GetCollisionModel()->ClearModel();
 	utils::AddSphereGeometry(mrigidBody.get_ptr(), mradius);
 	mrigidBody->GetCollisionModel()->BuildModel();
-
-	create_hydronynamic_force(mrigidBody.get_ptr(), mphysicalSystem, surfaceLoc, true);  //Arman : hydrodynamic forces
 
 //	// optional, attach a texture for better visualization  //Arman irrlicht
 //	ChSharedPtr<ChTexture> mtextureball(new ChTexture());
@@ -466,10 +465,22 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
 
-	gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf);
+	gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
 
 	// Return the number of generated particles.
 	return gen.getTotalNumBodies();
+}
+
+// =============================================================================
+// Add customized attributes the set of bodies in the physical system that are
+// in the range [idx_i, idx_j]
+// =============================================================================
+void AddCustomAttribute(ChSystemParallel& mphysicalSystem, int idx_i, int idx_j) {
+	std::vector<ChBody*>::iterator myIter = mphysicalSystem.Get_bodylist()->begin() + idx_i;
+	for (int i = idx_i; i < idx_j; i++) {
+		create_hydronynamic_force(*myIter, mphysicalSystem, surfaceLoc, true);  //Arman : hydrodynamic forces
+		myIter++;
+	}
 }
 //***********************************
 void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
@@ -477,7 +488,7 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	//**************** sphere prob
 	double expandR = mradius*1.05;
 
-	double iceThickness = numLayers * mradius * 2;
+	double iceThickness = numLayers * expandR * 2;
 	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
 
 	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
@@ -488,6 +499,9 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	double global_x = boxMin.x;
 	double global_y = surfaceLoc.y - buttomLayerDY;
 	double global_z = boxMin.z;
+
+	int idxI = mphysicalSystem.Get_bodylist()->size();
+
 //	GenerateIceLayers_Rectangular(mphysicalSystem,
 //			boxMin, boxMax,
 //			global_x, global_y, global_z,
@@ -499,6 +513,9 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 			expandR, mmass,	minert);
 
 //	int totalGranular = CreateIceParticles(mphysicalSystem);
+
+	int idxJ = mphysicalSystem.Get_bodylist()->size();
+	AddCustomAttribute(mphysicalSystem, idxI, idxJ);
 
 	//**************** bin and ship
 	// IDs for the two bodies
@@ -519,7 +536,7 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	bin->SetMaterialSurface(mat);
 	bin->SetIdentifier(binId);
 	bin->SetMass(1);
-	bin->SetPos(ChVector<>(center.x, center.y - 0.5 * hdim.y, center.z));
+	bin->SetPos(ChVector<>(center.x, center.y, center.z));
 	bin->SetRot(ChQuaternion<>(1, 0, 0, 0));
 	bin->SetCollide(true);
 	bin->SetBodyFixed(true);
@@ -545,7 +562,7 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	shipInitialPosZ = boxMin.z - .5 * box_Z;
 
 	shipPtr = ChSharedBodyPtr(new ChBody(new ChCollisionModelParallel));
-	shipInitialPos = ChVector<>(center.x,  center.y - .5 * hdim.y, shipInitialPosZ);
+	shipInitialPos = ChVector<>(center.x,  center.y, shipInitialPosZ);
 	shipPtr->SetPos(shipInitialPos);
 	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
 	shipPtr->SetMaterialSurface(mat);
@@ -656,7 +673,7 @@ int main(int argc, char* argv[])
 
 	// ***** params
 	double gravity = 9.81;
-	double dT = 0.05* mradius / shipVelocity; //moving 0.1*R at each time step
+	double dT = 0.1* mradius / shipVelocity; //moving 0.1*R at each time step
 	double time_end = 100;
 	double out_fps = 50;
 	uint max_iteration = 5000;//10000;
@@ -730,7 +747,7 @@ int main(int argc, char* argv[])
 		ChIrrWizard::add_typical_Logo  (application.GetDevice());
 		ChIrrWizard::add_typical_Sky   (application.GetDevice());
 		ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(14.0f, 44.0f, -18.0f), core::vector3df(-3.0f, 8.0f, 6.0f), 59,  40);
-		ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-3,12,-8), core::vector3df(0,1,0));
+		ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(7.2,20,21.2), core::vector3df(7.2,1,10)); //   (7.2,30,0) :  (-3,12,-8)
 		// Use this function for adding a ChIrrNodeAsset to all items
 		// If you need a finer control on which item really needs a visualization proxy in
 		// Irrlicht, just use application.AssetBind(myitem); on a per-item basis.
@@ -815,10 +832,6 @@ int main(int argc, char* argv[])
 		myTimerStep.stop();
 		myTimerTotal.stop();
 		//****************************************************
-//		for(int i=0; i<mphysicalSystem.Get_bodylist()->size(); i++){
-//			create_hydronynamic_force(mphysicalSystem.Get_bodylist()->at(i), mphysicalSystem, surfaceLoc, false);
-//
-//		}
 		vector<ChBody*>::iterator ibody = mphysicalSystem.Get_bodylist()->begin();
 		double energy = 0;
 		while (ibody != mphysicalSystem.Get_bodylist()->end()) {
@@ -827,6 +840,7 @@ int main(int argc, char* argv[])
 			ibody++;
 		}
 
+		printf("*** total number of contacts %d\n", mphysicalSystem.GetNcontacts());
 		stringstream outDataSS;
 		outDataSS << mphysicalSystem.GetChTime() << ", " <<
 				mForceContact.x << ", " << mForceContact.y << ", " << mForceContact.z << ", " << mForceContact.Length() << ", " <<
