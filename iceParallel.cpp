@@ -363,50 +363,20 @@ void GenerateIceLayers_Rectangular(
 
 	}
 }
-//***********************************
-void addHCPSheet(
-		ChSystemParallelDVI& mphysicalSystem,
-		int grid_x,       //number of particles in x direction
-		int grid_z,       //number of particles in z direction
-		double height,    //height of layer
-		double global_x,  //global offset of sheet in x
-		double global_z,  //global offset of sheet in z
-		double expandR)
-{
-    double offset = 0;
-    double x = 0, y = height, z = 0;
-    for (int i = 0; i < grid_x; i++) {
-      for (int k = 0; k < grid_z; k++) {
-        //need to offset alternate rows by radius
-        offset = (k % 2 != 0) ? expandR : 0;
-        //x position, shifted to center
-        x = i * 2 * expandR + offset + expandR + global_x;
-        //z position shifted to center
-        z = k * (sqrt(3.0) * expandR)  + expandR + global_z;
-        // x, y, z contain coordinates for sphere position
 
-
-		ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
-		ChVector<> pos = ChVector<>(x, height, z);
-//		cout << "myrand " << MyRand() << endl;
-//		if (MyRand() > (porosity - minPorosity) / (1 - minPorosity) ) CreateSphere(mphysicalSystem, pos);
-		CreateSphere(mphysicalSystem, pos);
-      }
-    }
-}
 //***********************************
 void GenerateIceLayers_Hexagonal(
-		ChSystemParallelDVI& mphysicalSystem,
 		ChVector<> boxMin,
 		ChVector<> boxMax,
 		double global_x, //global offset in x
 		double global_y, //global offset in y
-		double global_z, //global offset in z
-		double expandR)
-{
+		double global_z,
+		double expandR,
 
-	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
-	int numColZ = (boxMax.z - boxMin.z - expandR) / (sqrt(3.0) * expandR);
+		vector<double> & px, vector<double> & py, vector<double> & pz) //global offset in z
+{
+	int numColX = (boxMax.x - boxMin.x - 2 * expandR) / (2 * expandR);
+	int numColZ = (boxMax.z - boxMin.z - 2 * expandR) / (sqrt(3.0) * expandR);
     double offset_x = 0, offset_z = 0;
     for (int j = 0; j < numLayers; j++) {
       double y = j * (sqrt(3.0) * expandR);
@@ -417,39 +387,9 @@ void GenerateIceLayers_Hexagonal(
       for (int i = 0; i < numColX; i++) {
         for (int k = 0; k < numColZ; k++) {
 			offset = (k % 2 != 0) ? expandR : 0;
-			x = i * 2 * expandR + offset + expandR + global_x;
-			z = k * (sqrt(3.0) * expandR)  + expandR + global_z;
+			x = i * 2 * expandR + offset + (expandR + global_x + offset_x);
+			z = k * (sqrt(3.0) * expandR)  + (expandR + global_z + offset_z);
 			ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
-			ChVector<> pos = ChVector<>(x, y, z);
-			CreateSphere(mphysicalSystem, pos);
-        }
-      }
-    }
-}
-
-//***********************************
-void GenerateIceLayers_Hexagonal_Beta(
-		ChVector<> boxMin,
-		ChVector<> boxMax,
-		double global_x, //global offset in x
-		double global_y, //global offset in y
-		double global_z,
-		double expandR,
-
-		vector<double> & px, vector<double> & py, vector<double> & pz) //global offset in z
-{
-	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
-	int numColZ = (boxMax.z - boxMin.z - expandR) / (sqrt(3.0) * expandR);
-    for (int j = 0; j < numLayers; j++) {
-      double y = j * (sqrt(3.0) * expandR);
-      double offset = (j % 2 != 0) ? expandR : 0;
-      //need to offset each alternate layer by radius in both x and z direction
-      double x = 0, z = 0;
-      for (int i = 0; i < numColX; i++) {
-        for (int k = 0; k < numColZ; k++) {
-			x = i * 2 * expandR + offset + expandR + global_x;
-			z = k * 2 * expandR + offset + expandR + global_z;
-
 			ChVector<> pos = ChVector<>(x, y, z);
 			px.push_back(pos.x);
 			py.push_back(pos.y);
@@ -520,7 +460,7 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
 
-	gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+	gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
 
 	// Return the number of generated particles.
 	return gen.getTotalNumBodies();
@@ -560,16 +500,12 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 //			global_x, global_y, global_z,
 //			expandR);
 
-//	GenerateIceLayers_Hexagonal(mphysicalSystem,
-//			boxMin, boxMax,
-//			global_x, global_y, global_z,
-//			expandR);
+//	vector<double> px, py, pz;
+//	GenerateIceLayers_Hexagonal(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
+//	AddParticlesToSys(mphysicalSystem, px, py, pz);
 
-//	(void)CreateIceParticles(mphysicalSystem);
+	(void)CreateIceParticles(mphysicalSystem);
 
-	vector<double> px, py, pz;
-	GenerateIceLayers_Hexagonal_Beta(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
-	AddParticlesToSys(mphysicalSystem, px, py, pz);
 
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
 	AddCustomAttribute(mphysicalSystem, idxI, idxJ);
