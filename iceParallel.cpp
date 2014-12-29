@@ -72,6 +72,12 @@ using namespace io;
 using namespace gui;
 using namespace std;
 
+enum DriveType {
+	ACTUATOR,
+	KINEMATIC
+};
+DriveType driveType;
+//******************* Initialize attributes *******************
 const double rhoF = 1000;
 const double rhoR = 917;
 const double rhoPlate = 1000;
@@ -80,30 +86,24 @@ const double minPorosity = 0.2595;
 const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
-enum DriveType {
-	ACTUATOR,
-	KINEMATIC
-};
-DriveType driveType;
-//******************* ship and sphere stuff
-double mradius = 1;
-int numLayers = 2;
-
-//ChBodySceneNode* shipPtr;
-//ChSharedPtr<ChBodyEasyBox> shipPtr; //old irrlicht version
-ChSharedBodyPtr shipPtr;
-ChSharedBodyPtr bin;
+double mradius = 0.4;
+double collisionEnvelop = .04 * mradius;
+int numLayers = 3;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
-double shipInitialPosZ = 0;
 const double timePause = 1;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
 const double timeMove = 2.5;
+
+// ** box and ship locations **
 const double ship_width = 4;
 const double box_X = ship_width, box_Y = 10, box_Z = .4;
-double collisionEnvelop = .04 * mradius;
 ChVector<> shipInitialPos;
+double shipInitialPosZ = 0;
 ChVector<> hdim = ChVector<>(16, 12, 21.2); //domain dimension
 ChVector<> boxMin = ChVector<>(-.8, -6, -2.4); //component y is not really important
-//**********************************
+//**************************************************************
+ChSharedBodyPtr shipPtr;
+ChSharedBodyPtr bin;
+//**************************************************************
 void MySeed(double s = time(NULL)) {
 	 srand(s);
 }
@@ -199,7 +199,6 @@ void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallel& mphysicalSy
 		ChVector<> F_Hydro;
 		ChVector<> forceLoc;
 		ChVector<> T_Drag;
-		printf("force update \n");
 
 		Calc_Hydrodynamics_Forces(F_Hydro, forceLoc, T_Drag, mrigidBody, mphysicalSystem, freeSurfaceLocation);
 
@@ -450,9 +449,9 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Generate the particles
 	// ----------------------
 
-	double expandR = 1.01 * mradius;
+	double expandR = 1.05 * mradius;
 	double iceThickness = numLayers * expandR * 2;
-	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
+	double buttomLayerDY = rhoR / rhoF *  iceThickness;
 	ChVector<> boxMinGranular = ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z);
 //	ChVector<> hdimGranularHalf = 0.5 * hdim - ChVector<>(expandR);
 	ChVector<> hdimGranularHalf = 0.5 * ChVector<>(hdim.x, iceThickness, hdim.z) - ChVector<>(expandR);
@@ -460,7 +459,7 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
 
-	gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+	gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
 
 	// Return the number of generated particles.
 	return gen.getTotalNumBodies();
@@ -500,11 +499,11 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 //			global_x, global_y, global_z,
 //			expandR);
 
-	vector<double> px, py, pz;
-	GenerateIceLayers_Hexagonal(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
-	AddParticlesToSys(mphysicalSystem, px, py, pz);
+//	vector<double> px, py, pz;
+//	GenerateIceLayers_Hexagonal(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
+//	AddParticlesToSys(mphysicalSystem, px, py, pz);
 
-//	(void)CreateIceParticles(mphysicalSystem);
+	(void)CreateIceParticles(mphysicalSystem);
 
 
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
