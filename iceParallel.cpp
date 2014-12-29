@@ -81,8 +81,6 @@ DriveType driveType;
 const double rhoF = 1000;
 const double rhoR = 917;
 const double rhoPlate = 1000;
-const double porosity = .35; //set value of porosity
-const double minPorosity = 0.2595;
 const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
@@ -92,6 +90,7 @@ int numLayers = 3;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 const double timePause = 1;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
 const double timeMove = 2.5;
+double iceThickness;
 
 // ** box and ship locations **
 const double ship_width = 4;
@@ -103,6 +102,7 @@ ChVector<> boxMin = ChVector<>(-.8, -6, -2.4); //component y is not really impor
 //**************************************************************
 ChSharedBodyPtr shipPtr;
 ChSharedBodyPtr bin;
+ofstream outSimulationInfo;
 //**************************************************************
 void MySeed(double s = time(NULL)) {
 	 srand(s);
@@ -296,118 +296,6 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 //	mTorque = ChVector<>(contactPt.x - bodyCenter.x, contactPt.y - bodyCenter.y, contactPt.z - bodyCenter.z) % mForce;
 	mForce = ChVector<>(myForce.x, myForce.y, myForce.z);
 }
-//***********************************
-void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChVector<> pos) {
-	static int sphereID = 0;
-
-	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
-	double minert = (2./5.)* mmass * pow(mradius,2);
-	ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
-
-	// set moment of inertia (more realistic than default 1,1,1).
-	mrigidBody->SetIdentifier(sphereID++);
-	mrigidBody->SetMass(mmass);
-	mrigidBody->SetInertiaXX(minert * ChVector<>(1, 1, 1));
-	mrigidBody->SetPos(pos);
-	mrigidBody->SetPos_dt(ChVector<>(0,0,0));
-	mrigidBody->SetRot(ChQuaternion<>(1, 0, 0, 0));
-	mrigidBody->SetBodyFixed(false);
-	mrigidBody->SetCollide(true);
-
-
-	ChSharedPtr<ChMaterialSurface> ballMat(new ChMaterialSurface);
-	ballMat->SetFriction(0.4f);
-	ballMat->SetCompliance(0.0);
-	ballMat->SetComplianceT(0.0);
-	ballMat->SetDampingF(0.2);
-	mrigidBody->SetMaterialSurface(ballMat);
-
-	//		mrigidBody->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
-	mrigidBody->GetCollisionModel()->ClearModel();
-	utils::AddSphereGeometry(mrigidBody.get_ptr(), mradius);
-	mrigidBody->GetCollisionModel()->BuildModel();
-
-//	// optional, attach a texture for better visualization  //Arman irrlicht
-//	ChSharedPtr<ChTexture> mtextureball(new ChTexture());
-//	mtextureball->SetTextureFilename(GetChronoDataFile("../data/bluwhite.png"));
-//	mrigidBody->AddAsset(mtextureball);
-
-	mphysicalSystem.Add(mrigidBody);
-}
-//***********************************
-void GenerateIceLayers_Rectangular(
-		ChSystemParallelDVI& mphysicalSystem,
-		ChVector<> boxMin,
-		ChVector<> boxMax,
-		double global_x, //global offset in x
-		double global_y, //global offset in y
-		double global_z, //global offset in z
-		double expandR)
-{
-	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
-	int numColZ = (boxMax.z - boxMin.z - expandR) / (2 * expandR);
-	double spacing = 2 * expandR;
-	for (int j = 0; j < numLayers; j++) {
-		for (int i = 0; i < numColX; i++) {
-			for (int k = 0; k < numColZ; k++) {
-				// Create a ball that will collide with wall
-				ChVector<> pos = ChVector<>(
-						ChVector<>(global_x, global_y, global_z)
-						+ ChVector<>((i+0.5) * spacing, j * spacing, (k+0.5) * spacing)
-						+ .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom())
-						);
-				CreateSphere(mphysicalSystem, pos);
-			}
-		}
-
-	}
-}
-
-//***********************************
-void GenerateIceLayers_Hexagonal(
-		ChVector<> boxMin,
-		ChVector<> boxMax,
-		double global_x, //global offset in x
-		double global_y, //global offset in y
-		double global_z,
-		double expandR,
-
-		vector<double> & px, vector<double> & py, vector<double> & pz) //global offset in z
-{
-	int numColX = (boxMax.x - boxMin.x - 2 * expandR) / (2 * expandR);
-	int numColZ = (boxMax.z - boxMin.z - 2 * expandR) / (sqrt(3.0) * expandR);
-    double offset_x = 0, offset_z = 0;
-    for (int j = 0; j < numLayers; j++) {
-      double y = j * (sqrt(3.0) * expandR);
-      //need to offset each alternate layer by radius in both x and z direction
-      offset_x = offset_z = (j % 2 != 0) ? expandR : 0;
-      double offset = 0;
-      double x = 0, z = 0;
-      for (int i = 0; i < numColX; i++) {
-        for (int k = 0; k < numColZ; k++) {
-			offset = (k % 2 != 0) ? expandR : 0;
-			x = i * 2 * expandR + offset + (expandR + global_x + offset_x);
-			z = k * (sqrt(3.0) * expandR)  + (expandR + global_z + offset_z);
-			ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
-			ChVector<> pos = ChVector<>(x, y, z);
-			px.push_back(pos.x);
-			py.push_back(pos.y);
-			pz.push_back(pos.z);
-        }
-      }
-    }
-}
-
-void AddParticlesToSys(
-		ChSystemParallelDVI& mphysicalSystem, vector<double> & px, vector<double> & py, vector<double> & pz) //global offset in z
-{
-	int numPart = px.size();
-	for (int i = 0; i < numPart; i++) {
-		ChVector<> pos = ChVector<>(px[i], py[i], pz[i]);
-		ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
-		CreateSphere(mphysicalSystem, pos);
-	}
-}
 
 // =============================================================================
 // Create the Brash Ice
@@ -449,17 +337,37 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Generate the particles
 	// ----------------------
 
-	double expandR = 1.05 * mradius;
-	double iceThickness = numLayers * expandR * 2;
-	double buttomLayerDY = rhoR / rhoF *  iceThickness;
+	double expandR = 1.00 * mradius;
+	double boxY = numLayers * expandR * 2;
+	double buttomLayerDY = rhoR / rhoF *  boxY;
 	ChVector<> boxMinGranular = ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z);
 //	ChVector<> hdimGranularHalf = 0.5 * hdim - ChVector<>(expandR);
-	ChVector<> hdimGranularHalf = 0.5 * ChVector<>(hdim.x, iceThickness, hdim.z) - ChVector<>(expandR);
+	ChVector<> hdimGranularHalf = 0.5 * ChVector<>(hdim.x, boxY, hdim.z) - ChVector<>(expandR);
 	ChVector<> centerGranular = boxMinGranular + (hdimGranularHalf + ChVector<>(expandR));
 
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
-
 	gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+	// ** post process calc
+	iceThickness = boxY * mradius / expandR /*because of packing due to gravity*/ - mradius /*surface roughness*/ ;
+	iceThickness = (iceThickness > 0) ? iceThickness : 0;
+	double iceContainerVolume = hdim.x * iceThickness * hdim.z;
+	double iceApproxVolume = gen.getTotalNumBodies() * 4.0 / 3 * CH_C_PI * pow(mradius, 3);
+	double porosity = 1 - iceApproxVolume / iceContainerVolume;
+	printf("*** Porosity : %f, min theoretical porosity %f\n", porosity, 0.2595);
+	printf("****************************************************************\n");
+	outSimulationInfo << "****** ice initial properties *******" << endl
+			<< "set dims: iceBox X, approxIceThickness, Z : " << hdim.x << ", " << iceThickness << ", " << hdim.z << endl
+			<< "granular dims (i.e the containing box at the initialization : " << 2 * hdimGranularHalf.x << ", " << 2 * hdimGranularHalf.y << ", " << 2 * hdimGranularHalf.z << endl
+			<< "num layers : " << 2.0 * hdimGranularHalf.y / (sqrt(3.0) * expandR) << endl
+			<< "num ice particles : " << gen.getTotalNumBodies() << endl
+			<< "ice radius : " << mradius << endl
+			<< "calculated volume: numPart * partVol : " << iceApproxVolume << endl
+			<< "porosity : 1 - calcVol / setVol : " << porosity << endl
+			<< "porosity : 1 - calcVol / granular dim : " << 1 - iceApproxVolume / (4 * hdimGranularHalf.x * iceThickness * hdimGranularHalf.z) << endl
+			<< "porosity : 1 - calcVol / granular dim (with radius modification"  << 1 - iceApproxVolume / ((2 * hdimGranularHalf.x - mradius) * iceThickness * (2 * hdimGranularHalf.z - mradius)) << endl
+			<< "porosity, closed packing theoretical : " << 0.2595 << endl
+			<< "*************************************" << endl;
+
 
 	// Return the number of generated particles.
 	return gen.getTotalNumBodies();
@@ -479,34 +387,16 @@ void AddCustomAttribute(ChSystemParallel& mphysicalSystem, int idx_i, int idx_j)
 //***********************************
 void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 {
-	//**************** sphere prob
-	double expandR = mradius*1.05;
-
-	double iceThickness = numLayers * expandR * 2;
-	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
-
 	ChVector<> center = 0.5 * hdim + boxMin;
-	ChVector<> boxMax = boxMin + hdim;
-	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
-	double global_x = boxMin.x;
-	double global_y = surfaceLoc.y - buttomLayerDY;
-	double global_z = boxMin.z;
-
 	int idxI = mphysicalSystem.Get_bodylist()->size();
 
-//	GenerateIceLayers_Rectangular(mphysicalSystem,
-//			boxMin, boxMax,
-//			global_x, global_y, global_z,
-//			expandR);
-
-//	vector<double> px, py, pz;
-//	GenerateIceLayers_Hexagonal(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
-//	AddParticlesToSys(mphysicalSystem, px, py, pz);
+	// Generate ice particels
 
 	(void)CreateIceParticles(mphysicalSystem);
-
-
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
+
+	// Add hydrodynamic forces
+
 	AddCustomAttribute(mphysicalSystem, idxI, idxJ);
 
 	//**************** bin and ship
@@ -655,7 +545,7 @@ int main(int argc, char* argv[])
 	MySeed(964);
 
 	myTimerTotal.start();
-	ofstream outSimulationInfo("SimInfo.txt");
+	outSimulationInfo.open("SimInfo.txt");
 
 	if (argc > 1) {
 		const char* text = argv[1];
@@ -751,11 +641,8 @@ int main(int argc, char* argv[])
 		application.SetStepManage(true);
 		application.SetTimestep(dT);  					//Arman modify
 #endif
-		double iceThickness = numLayers * 2 * mradius * cos(CH_C_PI / 6.0);
-		double calculatedPorosity = 1 - (mphysicalSystem.Get_bodylist()->size() - 2) * 4.0 / 3 *CH_C_PI * pow(mradius, 3) /
-				( hdim.x * hdim.z * iceThickness);
 		outForceData << "[1] time, [2-5] forceContact (x, y, z, magnitude), [6-9] forceActuator (x, y, z, magnitude), [10-13] Ice pressure contact (x, y, z, magnitude), [14-17] Ice pressure actuator (x, y, z, magnitude), [18] shipPos, [19] shipVel, [20] energy, [21] iceThickness, [22] timePerStep, [23] timeElapsed. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
-				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << " ship_width: " << ship_width << " set porosity: " << porosity << " calculated porosity: " << calculatedPorosity << endl;
+				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << " ship_width: " << ship_width  << endl;
 		outForceData.close();
 		outSimulationInfo << "Real Time, Compute Time" << endl;
 
