@@ -84,9 +84,9 @@ const double rhoPlate = 1000;
 const double mu_Viscosity = .001;//.1;
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
-double mradius = 0.4;
+double mradius = 0.3;
+int numLayers = 1;
 double collisionEnvelop = .04 * mradius;
-int numLayers = 3;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 const double timePause = 1;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
 const double timeMove = 2.5;
@@ -392,7 +392,7 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 
 	// Generate ice particels
 
-	(void)CreateIceParticles(mphysicalSystem);
+//	(void)CreateIceParticles(mphysicalSystem);
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
 
 	// Add hydrodynamic forces
