@@ -500,11 +500,11 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 //			global_x, global_y, global_z,
 //			expandR);
 
-//	vector<double> px, py, pz;
-//	GenerateIceLayers_Hexagonal(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
-//	AddParticlesToSys(mphysicalSystem, px, py, pz);
+	vector<double> px, py, pz;
+	GenerateIceLayers_Hexagonal(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
+	AddParticlesToSys(mphysicalSystem, px, py, pz);
 
-	(void)CreateIceParticles(mphysicalSystem);
+//	(void)CreateIceParticles(mphysicalSystem);
 
 
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
