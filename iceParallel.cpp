@@ -87,7 +87,7 @@ enum DriveType {
 DriveType driveType;
 //******************* ship and sphere stuff
 double mradius = 1;
-int numLayers = 1;
+int numLayers = 2;
 
 //ChBodySceneNode* shipPtr;
 //ChSharedPtr<ChBodyEasyBox> shipPtr; //old irrlicht version
@@ -95,7 +95,7 @@ ChSharedBodyPtr shipPtr;
 ChSharedBodyPtr bin;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 double shipInitialPosZ = 0;
-const double timePause = 1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
+const double timePause = 1;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
 const double timeMove = 2.5;
 const double ship_width = 4;
 const double box_X = ship_width, box_Y = 10, box_Z = .4;
@@ -298,8 +298,12 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 	mForce = ChVector<>(myForce.x, myForce.y, myForce.z);
 }
 //***********************************
-void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChSharedBodyPtr mrigidBody, ChVector<> pos, double mmass, double minert) {
+void CreateSphere(ChSystemParallelDVI& mphysicalSystem, ChVector<> pos) {
 	static int sphereID = 0;
+
+	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
+	double minert = (2./5.)* mmass * pow(mradius,2);
+	ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
 
 	// set moment of inertia (more realistic than default 1,1,1).
 	mrigidBody->SetIdentifier(sphereID++);
@@ -338,10 +342,8 @@ void GenerateIceLayers_Rectangular(
 		ChVector<> boxMax,
 		double global_x, //global offset in x
 		double global_y, //global offset in y
-		double global_z,
-		double expandR,
-		double mmass,
-		double minert) //global offset in z
+		double global_z, //global offset in z
+		double expandR)
 {
 	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
 	int numColZ = (boxMax.z - boxMin.z - expandR) / (2 * expandR);
@@ -350,14 +352,12 @@ void GenerateIceLayers_Rectangular(
 		for (int i = 0; i < numColX; i++) {
 			for (int k = 0; k < numColZ; k++) {
 				// Create a ball that will collide with wall
-				ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
-
 				ChVector<> pos = ChVector<>(
 						ChVector<>(global_x, global_y, global_z)
 						+ ChVector<>((i+0.5) * spacing, j * spacing, (k+0.5) * spacing)
 						+ .5 * (spacing - 2 * mradius) * ChVector<>(ChRandom(), ChRandom(), ChRandom())
 						);
-				CreateSphere(mphysicalSystem, mrigidBody, pos, mmass, minert);
+				CreateSphere(mphysicalSystem, pos);
 			}
 		}
 
@@ -370,10 +370,8 @@ void addHCPSheet(
 		int grid_z,       //number of particles in z direction
 		double height,    //height of layer
 		double global_x,  //global offset of sheet in x
-		double global_z,
-		double expandR,
-		double mmass,
-		double minert)  //global offset of sheet in z
+		double global_z,  //global offset of sheet in z
+		double expandR)
 {
     double offset = 0;
     double x = 0, y = height, z = 0;
@@ -391,8 +389,8 @@ void addHCPSheet(
 		ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
 		ChVector<> pos = ChVector<>(x, height, z);
 //		cout << "myrand " << MyRand() << endl;
-//		if (MyRand() > (porosity - minPorosity) / (1 - minPorosity) ) CreateSphere(mphysicalSystem, mrigidBody, pos, mmass, minert);
-		CreateSphere(mphysicalSystem, mrigidBody, pos, mmass, minert);
+//		if (MyRand() > (porosity - minPorosity) / (1 - minPorosity) ) CreateSphere(mphysicalSystem, pos);
+		CreateSphere(mphysicalSystem, pos);
       }
     }
 }
@@ -403,20 +401,73 @@ void GenerateIceLayers_Hexagonal(
 		ChVector<> boxMax,
 		double global_x, //global offset in x
 		double global_y, //global offset in y
+		double global_z, //global offset in z
+		double expandR)
+{
+
+	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
+	int numColZ = (boxMax.z - boxMin.z - expandR) / (sqrt(3.0) * expandR);
+    double offset_x = 0, offset_z = 0;
+    for (int j = 0; j < numLayers; j++) {
+      double y = j * (sqrt(3.0) * expandR);
+      //need to offset each alternate layer by radius in both x and z direction
+      offset_x = offset_z = (j % 2 != 0) ? expandR : 0;
+      double offset = 0;
+      double x = 0, z = 0;
+      for (int i = 0; i < numColX; i++) {
+        for (int k = 0; k < numColZ; k++) {
+			offset = (k % 2 != 0) ? expandR : 0;
+			x = i * 2 * expandR + offset + expandR + global_x;
+			z = k * (sqrt(3.0) * expandR)  + expandR + global_z;
+			ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
+			ChVector<> pos = ChVector<>(x, y, z);
+			CreateSphere(mphysicalSystem, pos);
+        }
+      }
+    }
+}
+
+//***********************************
+void GenerateIceLayers_Hexagonal_Beta(
+		ChVector<> boxMin,
+		ChVector<> boxMax,
+		double global_x, //global offset in x
+		double global_y, //global offset in y
 		double global_z,
 		double expandR,
-		double mmass,
-		double minert) //global offset in z
+
+		vector<double> & px, vector<double> & py, vector<double> & pz) //global offset in z
 {
 	int numColX = (boxMax.x - boxMin.x - expandR) / (2 * expandR);
 	int numColZ = (boxMax.z - boxMin.z - expandR) / (sqrt(3.0) * expandR);
-    double offset_x = 0, offset_z = 0, height = 0;
     for (int j = 0; j < numLayers; j++) {
-      height = j * (sqrt(3.0) * expandR);
+      double y = j * (sqrt(3.0) * expandR);
+      double offset = (j % 2 != 0) ? expandR : 0;
       //need to offset each alternate layer by radius in both x and z direction
-      offset_x = offset_z = (j % 2 != 0) ? expandR : 0;
-      addHCPSheet(mphysicalSystem, numColX, numColZ, height + global_y, offset_x+global_x, offset_z+global_z, expandR, mmass, minert);
+      double x = 0, z = 0;
+      for (int i = 0; i < numColX; i++) {
+        for (int k = 0; k < numColZ; k++) {
+			x = i * 2 * expandR + offset + expandR + global_x;
+			z = k * 2 * expandR + offset + expandR + global_z;
+
+			ChVector<> pos = ChVector<>(x, y, z);
+			px.push_back(pos.x);
+			py.push_back(pos.y);
+			pz.push_back(pos.z);
+        }
+      }
     }
+}
+
+void AddParticlesToSys(
+		ChSystemParallelDVI& mphysicalSystem, vector<double> & px, vector<double> & py, vector<double> & pz) //global offset in z
+{
+	int numPart = px.size();
+	for (int i = 0; i < numPart; i++) {
+		ChVector<> pos = ChVector<>(px[i], py[i], pz[i]);
+		ChSharedBodyPtr mrigidBody(new ChBody(new ChCollisionModelParallel));
+		CreateSphere(mphysicalSystem, pos);
+	}
 }
 
 // =============================================================================
@@ -434,7 +485,11 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Create a material for the granular material
 	// -------------------------------------------
 	ChSharedPtr<ChMaterialSurface> mat_g(new ChMaterialSurface);
-	mat_g->SetFriction(mu_Viscosity);
+
+	mat_g->SetFriction(0.4f);
+	mat_g->SetCompliance(0.0);
+	mat_g->SetComplianceT(0.0);
+	mat_g->SetDampingF(0.2);
 
 	// ---------------------------------------------
 	// Create a mixture entirely made out of spheres
@@ -483,7 +538,7 @@ void AddCustomAttribute(ChSystemParallel& mphysicalSystem, int idx_i, int idx_j)
 	}
 }
 //***********************************
-void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
+void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 {
 	//**************** sphere prob
 	double expandR = mradius*1.05;
@@ -491,8 +546,6 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 	double iceThickness = numLayers * expandR * 2;
 	double buttomLayerDY = rhoR / rhoF *  iceThickness - mradius;
 
-	double mmass = (4./3.)*CH_C_PI*pow(mradius,3)*rhoR;
-	double minert = (2./5.)* mmass * pow(mradius,2);
 	ChVector<> center = 0.5 * hdim + boxMin;
 	ChVector<> boxMax = boxMin + hdim;
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
@@ -505,14 +558,18 @@ void create_ice_particles(ChSystemParallelDVI& mphysicalSystem)
 //	GenerateIceLayers_Rectangular(mphysicalSystem,
 //			boxMin, boxMax,
 //			global_x, global_y, global_z,
-//			expandR, mmass,	minert);
+//			expandR);
 
-	GenerateIceLayers_Hexagonal(mphysicalSystem,
-			boxMin, boxMax,
-			global_x, global_y, global_z,
-			expandR, mmass,	minert);
+//	GenerateIceLayers_Hexagonal(mphysicalSystem,
+//			boxMin, boxMax,
+//			global_x, global_y, global_z,
+//			expandR);
 
-//	int totalGranular = CreateIceParticles(mphysicalSystem);
+//	(void)CreateIceParticles(mphysicalSystem);
+
+	vector<double> px, py, pz;
+	GenerateIceLayers_Hexagonal_Beta(boxMin, boxMax, global_x, global_y, global_z, expandR, px, py, pz);
+	AddParticlesToSys(mphysicalSystem, px, py, pz);
 
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
 	AddCustomAttribute(mphysicalSystem, idxI, idxJ);
@@ -725,7 +782,7 @@ int main(int argc, char* argv[])
 	ofstream outForceData("forceData.txt");
 
 	// Create all the rigid bodies.
-	create_ice_particles(mphysicalSystem);
+	create_system_particles(mphysicalSystem);
 	Add_ship_ground_prismatic(mphysicalSystem);
 
 #ifdef CHRONO_PARALLEL_HAS_OPENGL2
@@ -840,7 +897,7 @@ int main(int argc, char* argv[])
 			ibody++;
 		}
 
-		printf("*** total number of contacts %d\n", mphysicalSystem.GetNcontacts());
+		printf("*** total number of contacts %d, num bodies %d\n", mphysicalSystem.GetNcontacts(), mphysicalSystem.Get_bodylist()->size());
 		stringstream outDataSS;
 		outDataSS << mphysicalSystem.GetChTime() << ", " <<
 				mForceContact.x << ", " << mForceContact.y << ", " << mForceContact.z << ", " << mForceContact.Length() << ", " <<
