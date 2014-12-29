@@ -82,9 +82,11 @@ const double rhoF = 1000;
 const double rhoR = 917;
 const double rhoPlate = 1000;
 const double mu_Viscosity = .001;//.1;
+double mu = .06; 		// friction coef, Ice
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 double mradius = 0.3;
+double expandR = 1.00 * mradius; // controlling the particles spacing at the initialization
 int numLayers = 1;
 double collisionEnvelop = .04 * mradius;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
@@ -313,7 +315,7 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// -------------------------------------------
 	ChSharedPtr<ChMaterialSurface> mat_g(new ChMaterialSurface);
 
-	mat_g->SetFriction(0.4f);
+	mat_g->SetFriction(mu);
 	mat_g->SetCompliance(0.0);
 	mat_g->SetComplianceT(0.0);
 	mat_g->SetDampingF(0.2);
@@ -337,7 +339,6 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Generate the particles
 	// ----------------------
 
-	double expandR = 1.00 * mradius;
 	double boxY = numLayers * expandR * 2;
 	double buttomLayerDY = rhoR / rhoF *  boxY;
 	ChVector<> boxMinGranular = ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z);
@@ -392,7 +393,7 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 
 	// Generate ice particels
 
-//	(void)CreateIceParticles(mphysicalSystem);
+	(void)CreateIceParticles(mphysicalSystem);
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
 
 	// Add hydrodynamic forces
@@ -406,7 +407,7 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 
 	// Create a common material
 	ChSharedPtr<ChMaterialSurface> mat(new ChMaterialSurface);
-	mat->SetFriction(0.4f);
+	mat->SetFriction(mu);
 	mat->SetDampingF(0.2f);
 
 	// Create the containing bin (2 x 2 x 1)
@@ -552,6 +553,12 @@ int main(int argc, char* argv[])
     	threads = atoi(text);
 	}
 	outSimulationInfo << "** num threads: " << threads << endl;
+
+	if (argc > 2) {
+		const char* text = argv[2];
+    	mu = atoi(text);
+	}
+	outSimulationInfo << "** mu: ice friction coeff: " << mu << endl;
 
 	// ***** params
 	double gravity = 9.81;
