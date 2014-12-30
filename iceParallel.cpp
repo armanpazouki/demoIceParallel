@@ -78,8 +78,8 @@ enum DriveType {
 };
 DriveType driveType;
 //******************* Initialize attributes *******************
-const double rhoF = 1000;
-const double rhoR = 917;
+const double rhoF = 1026;
+const double rhoR = 910;
 const double rhoPlate = 1000;
 const double mu_Viscosity = .001;//.1;
 double mu = .06; 		// friction coef, Ice
@@ -87,12 +87,11 @@ const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 double mradius = 0.3;
 double expandR = 1.00 * mradius; // controlling the particles spacing at the initialization
-int numLayers = 1;
+double iceThickness = 2.4;///2.85;
 double collisionEnvelop = .04 * mradius;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 const double timePause = 1;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
 const double timeMove = 2.5;
-double iceThickness;
 
 // ** box and ship locations **
 const double ship_width = 4;
@@ -227,9 +226,7 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 
 	unsigned int bodyID = shipPtr->GetId();// (((ChBody)shipPtr)->GetId());
 	int offset = 3; //Arman modify this
-	if (mphysicalSystem.GetSettings()->solver.solver_mode != SLIDING) {
-		offset = 3;
-	} else if (mphysicalSystem.GetSettings()->solver.solver_mode != SPINNING) {
+	if (mphysicalSystem.GetSettings()->solver.solver_mode != SPINNING) {
 		offset = 6;
 	}
 
@@ -241,36 +238,13 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 		int2 ids = mphysicalSystem.data_manager->host_data.bids_rigid_rigid[i];
 		real3 U = mphysicalSystem.data_manager->host_data.norm_rigid_rigid[i];
 		if (ids.x != bodyID && ids.y != bodyID) continue;
-		if (mphysicalSystem.GetSettings()->solver.solver_mode == NORMAL) {
-			gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
-			myForce += (-gam.x * dT * U);
-		} else if (mphysicalSystem.GetSettings()->solver.solver_mode == SLIDING) { //Arman check this
-			gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
-			gam.y = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 1];
-			gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];
-			real3 V, W;
-			Orthogonalize(U, V, W);
-			myForce += dT * (-U * gam.x - V * gam.y - W * gam.z);
-//			//*** torque related
-//		    bool2 active = contact_active[index];
-//		    if (active.x != 0) {
-//		       real3 T3, T4, T5;
-//		       Compute_Jacobian(rot[index], U, V, W, ptA[index], T3, T4, T5);
-//		       updateO[index] = T3 * gam.x + T4 * gam.y + T5 * gam.z;
-//		    }
-//		    if (active.y != 0) {
-//		       real3 T6, T7, T8;
-//		       Compute_Jacobian(rot[index + num_contacts], U, V, W, ptB[index], T6, T7, T8);
-//		       //updateV[index + num_contacts] = U * gam.x + V * gam.y + W * gam.z;
-//		       updateO[index + num_contacts] = -T6 * gam.x - T7 * gam.y - T8 * gam.z;
-//		    }
-		} else if (mphysicalSystem.GetSettings()->solver.solver_mode == SPINNING) { //Arman check this
-			gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
-			gam.y = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 1];
-			gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];
-			real3 V, W;
-			Orthogonalize(U, V, W);
-			myForce += (-U * gam.x - V * gam.y - W * gam.z) * dT;
+
+		gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
+		gam.y = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 1];
+		gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];
+		real3 V, W;
+		Orthogonalize(U, V, W);  // Arman: we have the values of gamma_v and gamma_w, but not their directions. This is probably is not a good way to get their directions
+		myForce += (-U * gam.x - V * gam.y - W * gam.z) * dT;
 //			//*** torque related
 //			if (active.x != 0) {
 //			 real4 quat = rot[index];
@@ -288,7 +262,6 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 //			 //updateV[index + num_contacts] = U * gam.x + V * gam.y + W * gam.z;
 //			 updateO[index + num_contacts] = -T6 * gam.x - T7 * gam.y - T8 * gam.z + TA * gam_roll.x + TB * gam_roll.y + TC * gam_roll.z;
 //			}
-		}
 	}
 
 
@@ -339,33 +312,41 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Generate the particles
 	// ----------------------
 
-	double boxY = numLayers * expandR * 2;
+
+	bool HCP_Pack = true;
+	double boxY = (iceThickness + mradius) * expandR / mradius;
 	double buttomLayerDY = rhoR / rhoF *  boxY;
 	ChVector<> boxMinGranular = ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z);
-//	ChVector<> hdimGranularHalf = 0.5 * hdim - ChVector<>(expandR);
 	ChVector<> hdimGranularHalf = 0.5 * ChVector<>(hdim.x, boxY, hdim.z) - ChVector<>(expandR);
 	ChVector<> centerGranular = boxMinGranular + (hdimGranularHalf + ChVector<>(expandR));
 
+	// HCP  : iceThickness = 2 * numLayers * mradius * cos(CH_C_PI/6.0) /*because of packing due to gravity*/ - mradius /*surface roughness*/ ;
+	// Grid : iceThickness = 2 * numLayers * mradius /*because of packing due to gravity*/ - mradius /*surface roughness*/ ;
+	int numLayers;
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
-	gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+	if (HCP_Pack) {
+		gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+		numLayers = 2 * hdimGranularHalf.y / cos(CH_C_PI / 6.0) / (2 * expandR) + 1;
+	} else {
+		gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+		numLayers = 2 * hdimGranularHalf.y / (2 * expandR) + 1;
+	}
 	// ** post process calc
-	iceThickness = boxY * mradius / expandR /*because of packing due to gravity*/ - mradius /*surface roughness*/ ;
-	iceThickness = (iceThickness > 0) ? iceThickness : 0;
 	double iceContainerVolume = hdim.x * iceThickness * hdim.z;
 	double iceApproxVolume = gen.getTotalNumBodies() * 4.0 / 3 * CH_C_PI * pow(mradius, 3);
 	double porosity = 1 - iceApproxVolume / iceContainerVolume;
 	printf("*** Porosity : %f, min theoretical porosity %f\n", porosity, 0.2595);
 	printf("****************************************************************\n");
 	outSimulationInfo << "****** ice initial properties *******" << endl
-			<< "set dims: iceBox X, approxIceThickness, Z : " << hdim.x << ", " << iceThickness << ", " << hdim.z << endl
-			<< "granular dims (i.e the containing box at the initialization : " << 2 * hdimGranularHalf.x << ", " << 2 * hdimGranularHalf.y << ", " << 2 * hdimGranularHalf.z << endl
-			<< "num layers : " << 2.0 * hdimGranularHalf.y / (sqrt(3.0) * expandR) << endl
+			<< "set dims: iceBox X, IceThickness, Z : " << hdim.x << ", " << iceThickness << ", " << hdim.z << endl
+			//<< "granular dims (i.e the containing box at the initialization : " << 2 * hdimGranularHalf.x << ", " << 2 * hdimGranularHalf.y << ", " << 2 * hdimGranularHalf.z << endl
+			<< "num layers : " << numLayers << endl
 			<< "num ice particles : " << gen.getTotalNumBodies() << endl
 			<< "ice radius : " << mradius << endl
 			<< "calculated volume: numPart * partVol : " << iceApproxVolume << endl
-			<< "porosity : 1 - calcVol / setVol : " << porosity << endl
+			<< "porosity* : 1 - calcVol / setVol : " << porosity << endl
 			<< "porosity : 1 - calcVol / granular dim : " << 1 - iceApproxVolume / (4 * hdimGranularHalf.x * iceThickness * hdimGranularHalf.z) << endl
-			<< "porosity : 1 - calcVol / granular dim (with radius modification"  << 1 - iceApproxVolume / ((2 * hdimGranularHalf.x - mradius) * iceThickness * (2 * hdimGranularHalf.z - mradius)) << endl
+			<< "porosity : 1 - calcVol / granular dim (with radius modification) :"  << 1 - iceApproxVolume / ((2 * hdimGranularHalf.x - mradius) * iceThickness * (2 * hdimGranularHalf.z - mradius)) << endl
 			<< "porosity, closed packing theoretical : " << 0.2595 << endl
 			<< "*************************************" << endl;
 
@@ -556,7 +537,7 @@ int main(int argc, char* argv[])
 
 	if (argc > 2) {
 		const char* text = argv[2];
-    	mu = atoi(text);
+    	mu = atof(text);
 	}
 	outSimulationInfo << "** mu: ice friction coeff: " << mu << endl;
 
@@ -629,6 +610,7 @@ int main(int argc, char* argv[])
 #endif
 
 #if irrlichtVisualization
+		cout << "@@@@@@@@@@@@@@@@  irrlicht stuff  @@@@@@@@@@@@@@@@" << endl;
 		// Create the Irrlicht visualization (open the Irrlicht device,
 		// bind a simple user interface, etc. etc.)
 		ChIrrApp application(&mphysicalSystem, L"Bricks test",core::dimension2d<u32>(800,600),false, true);
@@ -647,6 +629,8 @@ int main(int argc, char* argv[])
 
 		application.SetStepManage(true);
 		application.SetTimestep(dT);  					//Arman modify
+		cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << endl;
+
 #endif
 		outForceData << "[1] time, [2-5] forceContact (x, y, z, magnitude), [6-9] forceActuator (x, y, z, magnitude), [10-13] Ice pressure contact (x, y, z, magnitude), [14-17] Ice pressure actuator (x, y, z, magnitude), [18] shipPos, [19] shipVel, [20] energy, [21] iceThickness, [22] timePerStep, [23] timeElapsed. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
 				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << " ship_width: " << ship_width  << endl;
