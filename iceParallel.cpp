@@ -85,8 +85,8 @@ const double mu_Viscosity = .001;//.1;
 double mu = .06; 		// friction coef, Ice
 const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
-double mradius = 0.3;
-double expandR = 1.00 * mradius; // controlling the particles spacing at the initialization
+double mradius = 0.6;
+double expandR = 1.04 * mradius; // controlling the particles spacing at the initialization
 double iceThickness = 1.2;//2.4;///2.85;
 double collisionEnvelop = .04 * mradius;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
@@ -129,17 +129,19 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 
 	//mrigidBody->GetCollisionModel()->GetSafeMargin(); //this only works for sphere
 	double rad = mradius;
+	double vol_object = mrigidBody->GetMass() / mrigidBody->GetDensity();
+	double vol_sphere = 4.0 / 3 * CH_C_PI * pow(rad, 3);
 	//****************** Buoyancy Force
 	ChVector<> F_Buoyancy = ChVector<>(0,0,0);
 	forceLoc = bodyCtr;
 	if (dist < -rad) {
-		double V = 4.0 / 3 * CH_C_PI * pow(rad, 3);
-		F_Buoyancy = V * rhoF * g * freeSurfaceNormal;
+		double V_immersed = (vol_object / vol_sphere) * 4.0 / 3 * CH_C_PI * pow(rad, 3); //First, assume sphere, then modify to object
+		F_Buoyancy = V_immersed * rhoF * g * freeSurfaceNormal;
 		forceLoc = bodyCtr;
 	} else if (dist < rad) {
 		double h = rad - dist;
-		double V = CH_C_PI * h * h / 3 * (3 * rad - h);
-		F_Buoyancy = V * rhoF * g * freeSurfaceNormal;
+		double V_immersed = (vol_object / vol_sphere) * CH_C_PI * h * h / 3 * (3 * rad - h); //First, assume sphere, then modify to object
+		F_Buoyancy = V_immersed * rhoF * g * freeSurfaceNormal;
 		double distFromCenter = 3.0 / 4 * pow(2 * rad - h, 2) / (3 * rad - h); 	// http://mathworld.wolfram.com/SphericalCap.html -->
 																				// Harris and Stocker 1998, p. 107 (Harris, J. W. and Stocker,
 																				// H. "Spherical Segment (Spherical Cap)." §4.8.4 in Handbook of
@@ -299,10 +301,14 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 
 	// Create the particle generator with a mixture of 100% spheres
 	utils::Generator gen(&mphysicalSystem);
-	utils::MixtureIngredientPtr& m1 = gen.AddMixtureIngredient(utils::SPHERE, 1.0);
+	utils::MixtureIngredientPtr& m1 = gen.AddMixtureIngredient(utils::BOX, 0.5);
 	m1->setDefaultMaterialDVI(mat_g);
 	m1->setDefaultDensity(rhoR);
-	m1->setDefaultSize(mradius);
+	m1->setDefaultSize(ChVector<>(mradius, mradius, mradius));
+	utils::MixtureIngredientPtr& m2 = gen.AddMixtureIngredient(utils::SPHERE, .5);
+	m2->setDefaultMaterialDVI(mat_g);
+	m2->setDefaultDensity(rhoR);
+	m2->setDefaultSize(ChVector<>(mradius, mradius, mradius));
 
 	// Ensure that all generated particle bodies will have positive IDs.
 	int Id_g = 1;
@@ -324,12 +330,22 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Grid : iceThickness = 2 * numLayers * mradius /*because of packing due to gravity*/ - mradius /*surface roughness*/ ;
 	int numLayers;
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
-	if (HCP_Pack) {
-		gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
-		numLayers = 2 * hdimGranularHalf.y / cos(CH_C_PI / 6.0) / (2 * expandR) + 1;
-	} else {
+	utils::SamplingType sType = utils::REGULAR_GRID;
+	switch (sType) {
+	case utils::REGULAR_GRID:
 		gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
 		numLayers = 2 * hdimGranularHalf.y / (2 * expandR) + 1;
+		break;
+	case utils::POISSON_DISK:
+		gen.createObjectsBox(utils::POISSON_DISK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+		numLayers = 2 * hdimGranularHalf.y / (2 * expandR) + 1;
+		break;
+	case utils::HCP_PACK:
+		gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+		numLayers = 2 * hdimGranularHalf.y / cos(CH_C_PI / 6.0) / (2 * expandR) + 1;
+		break;
+	default:
+		printf("Initilaization config not found!\n");
 	}
 	// ** post process calc
 	double iceContainerVolume = hdim.x * iceThickness * hdim.z;
@@ -406,12 +422,12 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 	bin->SetBodyFixed(true);
 	bin->GetCollisionModel()->ClearModel();
 
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hdim.x, hdim.y, hthick), ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));	//end wall
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
+//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hdim.x, hdim.y, hthick), ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));	//end wall
+//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
+//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
+//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
+//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
+//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
 	bin->GetCollisionModel()->BuildModel();
 
 	mphysicalSystem.AddBody(bin);
