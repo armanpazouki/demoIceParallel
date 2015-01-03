@@ -87,7 +87,7 @@ const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
 
 double mradius = 0.3;
 double expandR = 1.00 * mradius; // controlling the particles spacing at the initialization
-double iceThickness = 2.4;///2.85;
+double iceThickness = 1.2;//2.4;///2.85;
 double collisionEnvelop = .04 * mradius;
 const double shipVelocity = 5.4;//.27;//1; //arman modify
 const double timePause = 1;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
@@ -373,8 +373,8 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 	int idxI = mphysicalSystem.Get_bodylist()->size();
 
 	// Generate ice particels
-
 	(void)CreateIceParticles(mphysicalSystem);
+
 	int idxJ = mphysicalSystem.Get_bodylist()->size();
 
 	// Add hydrodynamic forces
@@ -526,6 +526,9 @@ int main(int argc, char* argv[])
 	int threads = 2;
 	MySeed(964);
 
+	// Save PovRay post-processing data?
+	bool write_povray_data = true;
+
 	myTimerTotal.start();
 	outSimulationInfo.open("SimInfo.txt");
 
@@ -646,9 +649,11 @@ int main(int argc, char* argv[])
 		Add_Actuator(mphysicalSystem);
 	}
 
+	int counter = -1;
 	while(mphysicalSystem.GetChTime() < timeMove+timePause) //arman modify
 	{
 		myTimerStep.start();
+		counter ++;
 		// ****** include force or motion ********
 		switch (driveType) {
 		case KINEMATIC:
@@ -741,6 +746,14 @@ int main(int argc, char* argv[])
 				" ice thickness: " << iceThickness <<
 				" number of Iteration: " << numIter << endl;
 
+		// Save PovRay post-processing data.
+		const std::string pov_dir = "povray";
+		system("mkdir -p povray");
+		if (write_povray_data) {
+			char filename[100];
+			sprintf(filename, "%s/data_%03d.csv", pov_dir.c_str(), counter + 1);
+			utils::WriteBodies(&mphysicalSystem, filename);
+		}
 	}
 
 	outForceData.close();
