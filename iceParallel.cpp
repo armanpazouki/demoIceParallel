@@ -83,23 +83,23 @@ const double rhoR = 910;
 const double rhoPlate = 1000;
 const double mu_Viscosity = .001;//.1;
 double mu = .06; 		// friction coef, Ice
-const ChVector<> surfaceLoc = ChVector<>(0, .04, -.08);
+const ChVector<> surfaceLoc = ChVector<>(0, 0, 0);
 
-double mradius = 0.6;
+double mradius = .05;//.05;//0.6;
 double expandR = 1.04 * mradius; // controlling the particles spacing at the initialization
-double iceThickness = 1.2;//2.4;///2.85;
+double iceThickness = .174;//1.2;//2.4;///2.85;
 double collisionEnvelop = .04 * mradius;
-const double shipVelocity = 5.4;//.27;//1; //arman modify
-const double timePause = 1;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
-const double timeMove = 2.5;
+const double shipVelocity = .009;//5.4;//.27;//1; //arman modify
+const double timePause = 50;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
+const double timeMove = 500;
 
 // ** box and ship locations **
-const double ship_width = 4;
-const double box_X = ship_width, box_Y = 10, box_Z = .4;
+const double ship_w = 1;
+const double ship_y = 3, ship_z = .1;
 ChVector<> shipInitialPos;
 double shipInitialPosZ = 0;
-ChVector<> hdim = ChVector<>(16, 12, 21.2); //domain dimension
-ChVector<> boxMin = ChVector<>(-.8, -6, -2.4); //component y is not really important
+ChVector<> hdim = ChVector<>(4, 3, 6); //domain dimension
+ChVector<> boxMin = ChVector<>(0, -1.5, 0); //component y is not really important
 //**************************************************************
 ChSharedBodyPtr shipPtr;
 ChSharedBodyPtr bin;
@@ -409,7 +409,7 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 
 	// Create the containing bin (2 x 2 x 1)
 	double hthick = .1;
-	double hole_width = 1.2 * ship_width;
+	double hole_width = 1.2 * ship_w;
 	double small_wall_Length = 0.5 * (hdim.x - hole_width);
 
 	bin = ChSharedBodyPtr(new ChBody(new ChCollisionModelParallel));
@@ -422,24 +422,24 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 	bin->SetBodyFixed(true);
 	bin->GetCollisionModel()->ClearModel();
 
-//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hdim.x, hdim.y, hthick), ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));	//end wall
-//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
-//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
-//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
-//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
-//	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hdim.x, hdim.y, hthick), ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));	//end wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
 	bin->GetCollisionModel()->BuildModel();
 
 	mphysicalSystem.AddBody(bin);
 
 	//**************** create ship
-	double boxMass = rhoPlate * box_X * box_Y * box_Z;
-	double bI1 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Y, 2));
-	double bI2 = 1.0 / 12 * boxMass * (pow(box_Y, 2) + pow(box_Z, 2));
-	double bI3 = 1.0 / 12 * boxMass * (pow(box_X, 2) + pow(box_Z, 2));
-	printf("mass %f I1 I2 I3 %f %f %f\n", boxMass, bI1, bI2, bI3);
+	double shipMass = rhoPlate * ship_w * ship_y * ship_z;
+	double bI1 = 1.0 / 12 * shipMass * (pow(ship_w, 2) + pow(ship_y, 2));
+	double bI2 = 1.0 / 12 * shipMass * (pow(ship_y, 2) + pow(ship_z, 2));
+	double bI3 = 1.0 / 12 * shipMass * (pow(ship_w, 2) + pow(ship_z, 2));
+	printf("mass %f I1 I2 I3 %f %f %f\n", shipMass, bI1, bI2, bI3);
 
-	shipInitialPosZ = boxMin.z - .5 * box_Z;
+	shipInitialPosZ = boxMin.z - .5 * ship_z;
 
 	shipPtr = ChSharedBodyPtr(new ChBody(new ChCollisionModelParallel));
 	shipInitialPos = ChVector<>(center.x,  center.y, shipInitialPosZ);
@@ -447,7 +447,7 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 	shipPtr->SetRot(ChQuaternion<>(1,0,0,0));
 	shipPtr->SetMaterialSurface(mat);
 	shipPtr->SetPos_dt(ChVector<>(0,0,0));
-	shipPtr->SetMass(boxMass);
+	shipPtr->SetMass(shipMass);
 	shipPtr->SetInertiaXX(ChVector<>(bI2, bI3, bI1));
 	shipPtr->SetIdentifier(shipId);
 	shipPtr->SetCollide(true);
@@ -455,7 +455,7 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 
 	shipPtr->GetCollisionModel()->ClearModel();
 //	shipPtr->GetCollisionModel()->SetDefaultSuggestedEnvelope(collisionEnvelop); //envelop is .03 by default
-	utils::AddBoxGeometry(shipPtr.get_ptr(), 0.5 * ChVector<>(box_X, box_Y, box_Z), ChVector<>(0,0,0)); //beginning wall 2. Need "0.5 *" since chronoparallel is apparently different
+	utils::AddBoxGeometry(shipPtr.get_ptr(), 0.5 * ChVector<>(ship_w, ship_y, ship_z), ChVector<>(0,0,0)); //beginning wall 2. Need "0.5 *" since chronoparallel is apparently different
 	shipPtr->GetCollisionModel()->BuildModel();
 	mphysicalSystem.Add(shipPtr);
 }
@@ -487,7 +487,7 @@ void Add_Actuator(ChSystemParallelDVI& mphysicalSystem) {
 //	shipPtr->SetPos_dt(ChVector<>(0,0,shipVelocity));
 	ChSharedPtr<ChLinkLinActuator> actuator(new ChLinkLinActuator);
 	ChVector<> pt1 = shipPtr->GetPos();
-	ChVector<> pt2 = pt1 + ChVector<>(0, 0, 1000); //a large number in the z direction
+	ChVector<> pt2 = pt1 + ChVector<>(0, 0, 100); //a large number in the z direction
 	actuator->Initialize(shipPtr, bin, false, ChCoordsys<>(pt1, QUNIT), ChCoordsys<>(pt2, QUNIT));
 	actuator->SetName("actuator");
 	actuator->Set_lin_offset((pt2 - pt1).Length());
@@ -562,10 +562,10 @@ int main(int argc, char* argv[])
 
 	// ***** params
 	double gravity = 9.81;
-	double dT = 0.1* mradius / shipVelocity; //moving 0.1*R at each time step
+	double dT = 0.02* mradius / shipVelocity; //moving 0.1*R at each time step
 	double time_end = 100;
 	double out_fps = 50;
-	uint max_iteration = 5000;//10000;
+	uint max_iteration = 1000;//10000;
 	double tolerance = 1e-3;
 	// ************
 
@@ -594,7 +594,7 @@ int main(int argc, char* argv[])
 	mphysicalSystem.GetSettings()->solver.max_iteration_bilateral = max_iteration / 3;
 	mphysicalSystem.GetSettings()->solver.tolerance = 0;//tolerance;
 	mphysicalSystem.GetSettings()->solver.alpha = 0;  //Arman, find out what is this
-	mphysicalSystem.GetSettings()->solver.contact_recovery_speed = 2 * shipVelocity;  //Arman, I hope it is the counterpart of SetMaxPenetrationRecoverySpeed
+	mphysicalSystem.GetSettings()->solver.contact_recovery_speed = shipVelocity;  //Arman, I hope it is the counterpart of SetMaxPenetrationRecoverySpeed
 	mphysicalSystem.ChangeSolverType(APGDRS);  //Arman check this APGD APGDBLAZE
 	mphysicalSystem.GetSettings()->collision.narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
 
@@ -610,6 +610,8 @@ int main(int argc, char* argv[])
 	outSimulationInfo << "****************************************************************************" << endl;
 	outSimulationInfo << "dT: " << dT <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
 			" timePause: " << timePause << " timeMove: " << timeMove << endl;
+	cout << "dT: " << dT <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
+				" timePause: " << timePause << " timeMove: " << timeMove << endl;
 
 	ofstream outForceData("forceData.txt");
 
@@ -637,7 +639,7 @@ int main(int argc, char* argv[])
 		ChIrrWizard::add_typical_Logo  (application.GetDevice());
 		ChIrrWizard::add_typical_Sky   (application.GetDevice());
 		ChIrrWizard::add_typical_Lights(application.GetDevice(), core::vector3df(14.0f, 44.0f, -18.0f), core::vector3df(-3.0f, 8.0f, 6.0f), 59,  40);
-		ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(7.2,20,21.2), core::vector3df(7.2,1,10)); //   (7.2,30,0) :  (-3,12,-8)
+		ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(0.5,3,7), core::vector3df(2,1,5)); //   (7.2,30,0) :  (-3,12,-8)
 		// Use this function for adding a ChIrrNodeAsset to all items
 		// If you need a finer control on which item really needs a visualization proxy in
 		// Irrlicht, just use application.AssetBind(myitem); on a per-item basis.
@@ -652,7 +654,7 @@ int main(int argc, char* argv[])
 
 #endif
 		outForceData << "[1] time, [2-5] forceContact (x, y, z, magnitude), [6-9] forceActuator (x, y, z, magnitude), [10-13] Ice pressure contact (x, y, z, magnitude), [14-17] Ice pressure actuator (x, y, z, magnitude), [18] shipPos, [19] shipVel, [20] energy, [21] iceThickness, [22] timePerStep, [23] timeElapsed. ## numSpheres" << mphysicalSystem.Get_bodylist()->end() - mphysicalSystem.Get_bodylist()->begin()
-				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << " ship_width: " << ship_width  << endl;
+				<< " pauseTime: " << timePause<< " setVelocity: "<< shipVelocity << " ship_w: " << ship_w  << endl;
 		outForceData.close();
 		outSimulationInfo << "Real Time, Compute Time" << endl;
 
@@ -660,7 +662,7 @@ int main(int argc, char* argv[])
 	bool moveTime = false;
 	//****************************************** Time Loop *************************************
 	ChSharedPtr<ChFunction_Const> actuator_fun0(new ChFunction_Const(0));
-	ChSharedPtr<ChFunction_Ramp> actuator_fun1(new ChFunction_Ramp(0, -shipVelocity));
+	ChSharedPtr<ChFunction_Ramp> actuator_fun1(new ChFunction_Ramp(shipVelocity * timePause, -shipVelocity)); // function works with general system timer. since the initial force needs to be zero at t=timePause, 0 = x0 + v*t --> x0 = -v*t
 	if (driveType == ACTUATOR) {
 		Add_Actuator(mphysicalSystem);
 	}
@@ -686,8 +688,8 @@ int main(int argc, char* argv[])
 #if irrlichtVisualization
 		if ( !(application.GetDevice()->run()) ) break;
 		application.GetVideoDriver()->beginScene(true, true, SColor(255,140,161,192));
-		ChIrrTools::drawGrid(application.GetVideoDriver(), 1,1, 40,40,
-			ChCoordsys<>(ChVector<>(0,-2,0),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
+		ChIrrTools::drawGrid(application.GetVideoDriver(), .2,.2, 150,150,
+			ChCoordsys<>(ChVector<>(0.5 * hdim.x, boxMin.y, 0.5 * hdim.z),Q_from_AngAxis(CH_C_PI/2,VECT_X)), video::SColor(50,90,90,150),true);
 		application.DrawAll();
 		application.DoStep();
 		application.GetVideoDriver()->endScene();
@@ -715,10 +717,10 @@ int main(int argc, char* argv[])
 			actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
 			mForceActuator = actuator->Get_react_force();
 			mTorqueActuator = actuator->Get_react_torque();
-			icePressureActuator = mForceActuator / iceThickness / ship_width;
+			icePressureActuator = mForceActuator / iceThickness / ship_w;
 		}
 		calc_ship_contact_forces(mphysicalSystem, mForceContact, mTorqueContact);
-		ChVector<> icePressureContact = mForceContact / iceThickness / ship_width;
+		ChVector<> icePressureContact = mForceContact / iceThickness / ship_w;
 
 		myTimerStep.stop();
 		myTimerTotal.stop();
@@ -745,6 +747,7 @@ int main(int argc, char* argv[])
 
 		double numIter = ((ChLcpSolverParallelDVI*)mphysicalSystem.GetLcpSolverSpeed())->GetTotalIterations();
 		outSimulationInfo << "Time: " <<  mphysicalSystem.GetChTime() <<
+				" executionTime: " << mphysicalSystem.GetTimerStep() <<
 				" Ship pos: " << shipPtr->GetPos().x << ", " << shipPtr->GetPos().y << ", " <<  shipPtr->GetPos().z <<
 				" Ship vel: " << shipPtr->GetPos_dt().x << ", " << shipPtr->GetPos_dt().y << ", " <<  shipPtr->GetPos_dt().z <<
 				" energy: " << energy <<
@@ -754,6 +757,7 @@ int main(int argc, char* argv[])
 				" ice thickness: " << iceThickness <<
 				" number of Iteration: " << numIter << endl;
 		cout << "Time: " <<  mphysicalSystem.GetChTime() <<
+				" executionTime: " << mphysicalSystem.GetTimerStep() <<
 				" Ship vel: " << shipPtr->GetPos_dt().x << ", " << shipPtr->GetPos_dt().y << ", " <<  shipPtr->GetPos_dt().z <<
 				" energy: " << energy <<
 				" time per step: " << myTimerStep() <<
@@ -765,7 +769,7 @@ int main(int argc, char* argv[])
 		// Save PovRay post-processing data.
 		const std::string pov_dir = "povray";
 		system("mkdir -p povray");
-		if (write_povray_data) {
+		if (write_povray_data && counter % 50 == 0) {
 			char filename[100];
 			sprintf(filename, "%s/data_%03d.csv", pov_dir.c_str(), counter + 1);
 			utils::WriteBodies(&mphysicalSystem, filename);
