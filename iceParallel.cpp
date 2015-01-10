@@ -246,7 +246,8 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 		gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];
 		real3 V, W;
 		Orthogonalize(U, V, W);  // Arman: we have the values of gamma_v and gamma_w, but not their directions. This is probably is not a good way to get their directions
-		myForce += (-U * gam.x - V * gam.y - W * gam.z) * dT;
+		real3 f3 = (U * gam.x + V * gam.y + W * gam.z) / dT; // assume gamma is impulse, i.e. f*dT
+		myForce += (ids.x == bodyID) ? f3 : -f3;
 //			//*** torque related
 //			if (active.x != 0) {
 //			 real4 quat = rot[index];
@@ -409,7 +410,7 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 
 	// Create the containing bin (2 x 2 x 1)
 	double hthick = .1;
-	double hole_width = 1.2 * ship_w;
+	double hole_width = 1.05 * ship_w;
 	double small_wall_Length = 0.5 * (hdim.x - hole_width);
 
 	bin = ChSharedBodyPtr(new ChBody(new ChCollisionModelParallel));
@@ -423,10 +424,11 @@ void create_system_particles(ChSystemParallelDVI& mphysicalSystem)
 	bin->GetCollisionModel()->ClearModel();
 
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hdim.x, hdim.y, hthick), ChVector<>(0, 0, 0.5 * hdim.z + 0.5*hthick));	//end wall
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
-	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z + 2 * hthick), ChVector<>(-0.5 * hdim.x - 0.5 * hthick, 0, 0));		//side wall
+	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(hthick, hdim.y, hdim.z + 2 * hthick), ChVector<>(0.5 * hdim.x + 0.5 * hthick, 0, 0));	//side wall
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(-0.5 * hdim.x + 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); 	//beginning wall 1
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(small_wall_Length, hdim.y, hthick), ChVector<>(0.5 * hdim.x - 0.5*small_wall_Length, 0, -0.5 * hdim.z - 0.5*hthick)); //beginning wall 2
+
 	utils::AddBoxGeometry(bin.get_ptr(), 0.5 * ChVector<>(7 * hdim.x, hthick, 7 * hdim.x), ChVector<>(0,-10,0)); //bottom bed
 	bin->GetCollisionModel()->BuildModel();
 
@@ -500,12 +502,14 @@ void Add_Actuator(ChSystemParallelDVI& mphysicalSystem) {
 void MoveShip_Actuator(
 		ChSystemParallelDVI& mphysicalSystem,
 		ChSharedPtr<ChFunction> actuator_fun,
+		double vel,
 		int path_piece) {
 	static int interval = -1;
 	if (path_piece == interval) return;
 	ChSharedPtr<ChLinkLinActuator> actuator;
 	actuator = mphysicalSystem.SearchLink("actuator").StaticCastTo<ChLinkLinActuator>();
 	actuator->Set_dist_funct(actuator_fun);
+	shipPtr->SetPos_dt(ChVector<>(0,0, vel));
 	interval = path_piece;
 }
 
@@ -680,9 +684,11 @@ int main(int argc, char* argv[])
 				MoveShip_Kinematic(mphysicalSystem.GetChTime());
 			break;
 		case ACTUATOR:
-			(mphysicalSystem.GetChTime() < timePause) ?
-				MoveShip_Actuator(mphysicalSystem, actuator_fun0.StaticCastTo<ChFunction>(), 0) :
-				MoveShip_Actuator(mphysicalSystem, actuator_fun1.StaticCastTo<ChFunction>(), 1);
+			if (mphysicalSystem.GetChTime() < timePause) {
+				MoveShip_Actuator(mphysicalSystem, actuator_fun0.StaticCastTo<ChFunction>(), 0, 0);
+			} else {
+				MoveShip_Actuator(mphysicalSystem, actuator_fun1.StaticCastTo<ChFunction>(), shipVelocity, 1);
+			}
 		}
 		// ****** end of force or motion *********
 #if irrlichtVisualization
@@ -768,10 +774,15 @@ int main(int argc, char* argv[])
 
 		// Save PovRay post-processing data.
 		const std::string pov_dir = "povray";
-		system("mkdir -p povray");
-		if (write_povray_data && counter % 50 == 0) {
+		if (counter == 0) {
+			//linux. In windows, it is System instead of system (to invoke a command in the command line)
+			system("mkdir -p povray");
+			system("rm povray/*.*");
+		}
+		int stepSave = 50;
+		if (write_povray_data && counter % stepSave == 0) {
 			char filename[100];
-			sprintf(filename, "%s/data_%03d.csv", pov_dir.c_str(), counter + 1);
+			sprintf(filename, "%s/data_%03d.csv", pov_dir.c_str(), counter / stepSave + 1);
 			utils::WriteBodies(&mphysicalSystem, filename);
 		}
 	}
