@@ -82,16 +82,16 @@ const double rhoF = 1026;
 const double rhoR = 910;
 const double rhoPlate = 1000;
 const double mu_Viscosity = .001;//.1;
-double mu = .06; 		// friction coef, Ice
+double mu = .05; 		// friction coef, Ice
 const ChVector<> surfaceLoc = ChVector<>(0, 0, 0);
 
-double mradius = .05;//.05;//0.6;
+double mradius = .02;//.05;//0.6;
 double expandR = 1.04 * mradius; // controlling the particles spacing at the initialization
 double iceThickness = .174;//1.2;//2.4;///2.85;
 double collisionEnvelop = .04 * mradius;
-const double shipVelocity = .009;//5.4;//.27;//1; //arman modify
+const double shipVelocity = .002;//5.4;//.27;//1; //arman modify
 const double timePause = 50;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
-const double timeMove = 500;
+const double timeMove = 250;
 
 // ** box and ship locations **
 const double ship_w = 1;
@@ -566,7 +566,7 @@ int main(int argc, char* argv[])
 
 	// ***** params
 	double gravity = 9.81;
-	double dT = 0.02* mradius / shipVelocity; //moving 0.1*R at each time step
+	double dT = .05;//0.02* mradius / shipVelocity; //moving 0.1*R at each time step
 	double time_end = 100;
 	double out_fps = 50;
 	uint max_iteration = 1000;//10000;
@@ -608,7 +608,7 @@ int main(int argc, char* argv[])
 //	mphysicalSystem.GetSettings()->collision.max_body_per_bin = 100;	// Arman check: According to Hammad these are not used anymore
 
 	//******************* Irrlicht and driver types **************************
-#define irrlichtVisualization true
+#define irrlichtVisualization false
 	driveType = ACTUATOR;//KINEMATIC : ACTUATOR
 	//************************************************************************
 	outSimulationInfo << "****************************************************************************" << endl;
