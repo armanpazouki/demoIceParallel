@@ -83,6 +83,7 @@ const double rhoR = 910;
 const double rhoPlate = 1000;
 const double mu_Viscosity = .001;//.1;
 double mu = .05; 		// friction coef, Ice
+double iceCohision = 0; // cohesion value, Ice
 const ChVector<> surfaceLoc = ChVector<>(0, 0, 0);
 
 double mradius = .02;//.05;//0.6;
@@ -292,6 +293,7 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	ChSharedPtr<ChMaterialSurface> mat_g(new ChMaterialSurface);
 
 	mat_g->SetFriction(mu);
+	mat_g->SetCohesion(iceCohision);
 	mat_g->SetCompliance(0.0);
 	mat_g->SetComplianceT(0.0);
 	mat_g->SetDampingF(0.2);
@@ -302,14 +304,14 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 
 	// Create the particle generator with a mixture of 100% spheres
 	utils::Generator gen(&mphysicalSystem);
-	utils::MixtureIngredientPtr& m1 = gen.AddMixtureIngredient(utils::BOX, 0.5);
+	utils::MixtureIngredientPtr& m1 = gen.AddMixtureIngredient(utils::SPHERE, 1);
 	m1->setDefaultMaterialDVI(mat_g);
 	m1->setDefaultDensity(rhoR);
 	m1->setDefaultSize(ChVector<>(mradius, mradius, mradius));
-	utils::MixtureIngredientPtr& m2 = gen.AddMixtureIngredient(utils::SPHERE, .5);
-	m2->setDefaultMaterialDVI(mat_g);
-	m2->setDefaultDensity(rhoR);
-	m2->setDefaultSize(ChVector<>(mradius, mradius, mradius));
+//	utils::MixtureIngredientPtr& m2 = gen.AddMixtureIngredient(utils::BOX, .5);
+//	m2->setDefaultMaterialDVI(mat_g);
+//	m2->setDefaultDensity(rhoR);
+//	m2->setDefaultSize(ChVector<>(mradius, mradius, mradius));
 
 	// Ensure that all generated particle bodies will have positive IDs.
 	int Id_g = 1;
@@ -319,8 +321,6 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Generate the particles
 	// ----------------------
 
-
-	bool HCP_Pack = true;
 	double boxY = (iceThickness + mradius) * expandR / mradius;
 	double buttomLayerDY = rhoR / rhoF *  boxY;
 	ChVector<> boxMinGranular = ChVector<>(boxMin.x, surfaceLoc.y - buttomLayerDY, boxMin.z);
@@ -331,7 +331,7 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Grid : iceThickness = 2 * numLayers * mradius /*because of packing due to gravity*/ - mradius /*surface roughness*/ ;
 	int numLayers;
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
-	utils::SamplingType sType = utils::REGULAR_GRID;
+	utils::SamplingType sType = utils::HCP_PACK;
 	switch (sType) {
 	case utils::REGULAR_GRID:
 		gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
@@ -561,6 +561,11 @@ int main(int argc, char* argv[])
 	if (argc > 2) {
 		const char* text = argv[2];
     	mu = atof(text);
+	}
+
+	if (argc > 3) {
+		const char* text = argv[3];
+		iceCohision = atof(text);
 	}
 	outSimulationInfo << "** mu: ice friction coeff: " << mu << endl;
 
