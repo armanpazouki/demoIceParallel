@@ -99,7 +99,7 @@ const double ship_w = 1;
 const double ship_y = 3, ship_z = .1;
 ChVector<> shipInitialPos;
 double shipInitialPosZ = 0;
-ChVector<> hdim = ChVector<>(4, 3, 6); //domain dimension
+ChVector<> hdim = ChVector<>(4, 3, 3); //domain dimension
 ChVector<> boxMin = ChVector<>(0, -1.5, 0); //component y is not really important
 //**************************************************************
 ChSharedBodyPtr shipPtr;
@@ -572,7 +572,6 @@ int main(int argc, char* argv[])
 	// ***** params
 	double gravity = 9.81;
 	double dT = .05;//0.02* mradius / shipVelocity; //moving 0.1*R at each time step
-	double time_end = 100;
 	double out_fps = 50;
 	uint max_iteration = 1000;//10000;
 	double tolerance = 1e-3;
