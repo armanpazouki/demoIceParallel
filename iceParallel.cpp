@@ -242,9 +242,9 @@ void calc_ship_contact_forces(ChSystemParallelDVI& mphysicalSystem, ChVector<> &
 		real3 U = mphysicalSystem.data_manager->host_data.norm_rigid_rigid[i];
 		if (ids.x != bodyID && ids.y != bodyID) continue;
 
-		gam.x = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 0];
-		gam.y = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 1];
-		gam.z = mphysicalSystem.data_manager->host_data.gamma_data[i * offset + 2];
+		gam.x = mphysicalSystem.data_manager->host_data.gamma[i * offset + 0];
+		gam.y = mphysicalSystem.data_manager->host_data.gamma[i * offset + 1];
+		gam.z = mphysicalSystem.data_manager->host_data.gamma[i * offset + 2];
 		real3 V, W;
 		Orthogonalize(U, V, W);  // Arman: we have the values of gamma_v and gamma_w, but not their directions. This is probably is not a good way to get their directions
 		real3 f3 = (U * gam.x + V * gam.y + W * gam.z) / dT; // assume gamma is impulse, i.e. f*dT
@@ -603,7 +603,7 @@ int main(int argc, char* argv[])
 	mphysicalSystem.GetSettings()->solver.tolerance = 0;//tolerance;
 	mphysicalSystem.GetSettings()->solver.alpha = 0;  //Arman, find out what is this
 	mphysicalSystem.GetSettings()->solver.contact_recovery_speed = shipVelocity;  //Arman, I hope it is the counterpart of SetMaxPenetrationRecoverySpeed
-	mphysicalSystem.ChangeSolverType(APGDRS);  //Arman check this APGD APGDBLAZE
+	mphysicalSystem.ChangeSolverType(APGDREF);  //Arman check this APGD APGDBLAZE
 	mphysicalSystem.GetSettings()->collision.narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
 
 	mphysicalSystem.GetSettings()->collision.collision_envelope = collisionEnvelop;
