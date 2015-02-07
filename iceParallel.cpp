@@ -90,9 +90,9 @@ double mradius = .02;//.05;//0.6;
 double expandR = 1.04 * mradius; // controlling the particles spacing at the initialization
 double iceThickness = .174;//1.2;//2.4;///2.85;
 double collisionEnvelop = .04 * mradius;
-const double shipVelocity = .002;//5.4;//.27;//1; //arman modify
-const double timePause = 50;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
-const double timeMove = 250;
+double shipVelocity = .002;//5.4;//.27;//1; //arman modify
+const double timePause = 10;//1;//0.2; //arman modify : Time pause != 0 causes the actuator to explode
+double timeMove = 750;
 
 // ** box and ship locations **
 const double ship_w = 1;
@@ -304,14 +304,14 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 
 	// Create the particle generator with a mixture of 100% spheres
 	utils::Generator gen(&mphysicalSystem);
-	utils::MixtureIngredientPtr& m1 = gen.AddMixtureIngredient(utils::SPHERE, 1);
+	utils::MixtureIngredientPtr& m1 = gen.AddMixtureIngredient(utils::SPHERE, 0.5);
 	m1->setDefaultMaterialDVI(mat_g);
 	m1->setDefaultDensity(rhoR);
 	m1->setDefaultSize(ChVector<>(mradius, mradius, mradius));
-//	utils::MixtureIngredientPtr& m2 = gen.AddMixtureIngredient(utils::BOX, .5);
-//	m2->setDefaultMaterialDVI(mat_g);
-//	m2->setDefaultDensity(rhoR);
-//	m2->setDefaultSize(ChVector<>(mradius, mradius, mradius));
+	utils::MixtureIngredientPtr& m2 = gen.AddMixtureIngredient(utils::BOX, .5);
+	m2->setDefaultMaterialDVI(mat_g);
+	m2->setDefaultDensity(rhoR);
+	m2->setDefaultSize(ChVector<>(mradius, mradius, mradius));
 
 	// Ensure that all generated particle bodies will have positive IDs.
 	int Id_g = 1;
@@ -331,7 +331,7 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	// Grid : iceThickness = 2 * numLayers * mradius /*because of packing due to gravity*/ - mradius /*surface roughness*/ ;
 	int numLayers;
 	printf("************************** Generate Ice, ButtomLayer_Y %f\n", buttomLayerDY);
-	utils::SamplingType sType = utils::HCP_PACK;
+	utils::SamplingType sType = utils::REGULAR_GRID;
 	switch (sType) {
 	case utils::REGULAR_GRID:
 		gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
@@ -544,6 +544,8 @@ int main(int argc, char* argv[])
 	ChTimer<double> myTimerTotal;
 	ChTimer<double> myTimerStep;
 	int threads = 2;
+	uint max_iteration = 1000;//10000;
+	double dTSet = .05;
 	MySeed(964);
 
 	// Save PovRay post-processing data?
@@ -567,14 +569,32 @@ int main(int argc, char* argv[])
 		const char* text = argv[3];
 		iceCohision = atof(text);
 	}
+
+	if (argc > 4) {
+		const char* text = argv[4];
+		max_iteration = atoi(text);
+	}
+
+	if (argc > 5) {
+		const char* text = argv[5];
+		shipVelocity = atof(text);
+	}
+
+	if (argc > 6) {
+		const char* text = argv[6];
+		dTSet = atof(text);
+	}
+
+	timeMove = 0.5 * hdim.z / shipVelocity;
+
 	outSimulationInfo << "** mu: ice friction coeff: " << mu << endl;
 
 	// ***** params
 	double gravity = 9.81;
-	double dT = .05;//0.02* mradius / shipVelocity; //moving 0.1*R at each time step
+	double dT = min(dTSet, 0.02* mradius / shipVelocity); //moving 0.1*R at each time step
+	printf("dT: set %f, from velocity %f\n", dTSet, 0.02* mradius / shipVelocity);
 	double out_fps = 50;
-	uint max_iteration = 1000;//10000;
-	double tolerance = 1e-3;
+	double tolerance = 1e-3; // Arman, not used
 	// ************
 
 
@@ -584,7 +604,6 @@ int main(int argc, char* argv[])
 	//******************** OMP settings **************
 	// Set number of threads.
 	int max_threads = mphysicalSystem.GetParallelThreadNumber();
-	outSimulationInfo << "** max number of threads: " << max_threads << endl;
 	if (threads > max_threads)
 	  threads = max_threads;
 	mphysicalSystem.SetParallelThreadNumber(threads);
@@ -616,10 +635,12 @@ int main(int argc, char* argv[])
 	driveType = ACTUATOR;//KINEMATIC : ACTUATOR
 	//************************************************************************
 	outSimulationInfo << "****************************************************************************" << endl;
-	outSimulationInfo << "dT: " << dT <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
-			" timePause: " << timePause << " timeMove: " << timeMove << endl;
-	cout << "dT: " << dT <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
-				" timePause: " << timePause << " timeMove: " << timeMove << endl;
+	outSimulationInfo << " dT: " << dT  << " dTSet: " << dTSet <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
+			" timePause: " << timePause << " timeMove: " << timeMove << " max_iteration: " << max_iteration <<
+			" iceCohision: " << iceCohision << " mu: " << mu << " max_iteration: " << max_iteration << " threads: " << threads << endl;
+	cout << " dT: " << dT  << " dTSet: " << dTSet <<" shipVelocity: "<< shipVelocity << " particles_radius: " << mradius <<
+			" timePause: " << timePause << " timeMove: " << timeMove << " max_iteration: " << max_iteration <<
+			" iceCohision: " << iceCohision << " mu: " << mu << " max_iteration: " << max_iteration << " threads: " << threads << endl;
 
 	ofstream outForceData("forceData.txt");
 
