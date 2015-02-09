@@ -312,6 +312,10 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	m2->setDefaultMaterialDVI(mat_g);
 	m2->setDefaultDensity(rhoR);
 	m2->setDefaultSize(ChVector<>(mradius, mradius, mradius));
+//	utils::MixtureIngredientPtr& m3 = gen.AddMixtureIngredient(utils::CAPSULE, 0.5);
+//	m3->setDefaultMaterialDVI(mat_g);
+//	m3->setDefaultDensity(rhoR);
+//	m3->setDefaultSize(ChVector<>(mradius, mradius, mradius));
 
 	// Ensure that all generated particle bodies will have positive IDs.
 	int Id_g = 1;
@@ -334,15 +338,17 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	utils::SamplingType sType = utils::REGULAR_GRID;
 	switch (sType) {
 	case utils::REGULAR_GRID:
-		gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+		gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf);
 		numLayers = 2 * hdimGranularHalf.y / (2 * expandR) + 1;
+//		/* if CAPSULE */ gen.createObjectsBox(utils::REGULAR_GRID, ChVector<>(2 * expandR, 4*expandR, 2 * expandR), centerGranular, hdimGranularHalf);
+//		/* if CAPSULE */ numLayers = 2 * hdimGranularHalf.y / (4 * expandR) + 1;
 		break;
 	case utils::POISSON_DISK:
-		gen.createObjectsBox(utils::POISSON_DISK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+		gen.createObjectsBox(utils::POISSON_DISK, 2 * expandR, centerGranular, hdimGranularHalf);
 		numLayers = 2 * hdimGranularHalf.y / (2 * expandR) + 1;
 		break;
 	case utils::HCP_PACK:
-		gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf); //REGULAR_GRID : HCP_PACK
+		gen.createObjectsBox(utils::HCP_PACK, 2 * expandR, centerGranular, hdimGranularHalf);
 		numLayers = 2 * hdimGranularHalf.y / cos(CH_C_PI / 6.0) / (2 * expandR) + 1;
 		break;
 	default:
