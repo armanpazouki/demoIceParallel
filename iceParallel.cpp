@@ -340,7 +340,7 @@ int CreateIceParticles(ChSystemParallel& mphysicalSystem)
 	case utils::REGULAR_GRID:
 		gen.createObjectsBox(utils::REGULAR_GRID, 2 * expandR, centerGranular, hdimGranularHalf);
 		numLayers = 2 * hdimGranularHalf.y / (2 * expandR) + 1;
-//		/* if CAPSULE */ gen.createObjectsBox(utils::REGULAR_GRID, ChVector<>(2 * expandR, 4*expandR, 2 * expandR), centerGranular, hdimGranularHalf);
+//		/* if CAPSULE */ gen.createObjectsBox(ChVector<>(2 * expandR, 4*expandR, 2 * expandR), centerGranular, hdimGranularHalf);
 //		/* if CAPSULE */ numLayers = 2 * hdimGranularHalf.y / (4 * expandR) + 1;
 		break;
 	case utils::POISSON_DISK:
