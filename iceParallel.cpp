@@ -27,7 +27,6 @@
 // ------------------------------------------------ 
 //             www.deltaknowledge.com
 // ------------------------------------------------ 
-
 //#include "physics/ChBodyEasy.h"
 #include "physics/ChContactContainer.h"
 #include "collision/ChCModelBulletBody.h"
@@ -113,7 +112,7 @@ double MyRand() {
 	return float(rand()) / RAND_MAX;
 }
 void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVector<> & T_Drag,
-		ChBody* mrigidBody, ChSystemParallel& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation) {
+		ChBody* mrigidBody, ChSystemParallel& mphysicalSystem, const ChVector<>& freeSurfaceLocation) {
 	F_Hydro = ChVector<>(0,0,0);
 	forceLoc = ChVector<>(0,0,0);
 	T_Drag = ChVector<>(0,0,0);
@@ -170,7 +169,7 @@ void Calc_Hydrodynamics_Forces(ChVector<> & F_Hydro, ChVector<> & forceLoc, ChVe
 	F_Hydro = F_Buoyancy + F_Drag; // it is assumed that F_Drag is applied at the buoyancy center
 }
 //**********************************
-void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallel& mphysicalSystem, const chrono::ChVector<>& freeSurfaceLocation, bool createForce) {
+void create_hydronynamic_force(ChBody* mrigidBody, ChSystemParallel& mphysicalSystem, const ChVector<>& freeSurfaceLocation, bool createForce) {
 	// ***** insertion of force
 	ChSharedPtr<ChForce> hydroForce;
 	ChSharedPtr<ChForce> hydroTorque;
