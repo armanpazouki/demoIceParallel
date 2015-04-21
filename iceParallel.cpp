@@ -54,6 +54,10 @@
 #include "chrono_utils/ChUtilsGenerators.h"
 
 #ifdef CHRONO_PARALLEL_HAS_OPENGL
+#undef CHRONO_PARALLEL_HAS_OPENGL
+#endif
+
+#ifdef CHRONO_PARALLEL_HAS_OPENGL
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
 //***********************************
